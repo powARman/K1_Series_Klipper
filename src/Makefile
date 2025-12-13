@@ -2,7 +2,7 @@
 
 src-y += sched.c command.c basecmd.c debugcmds.c fan_check.c
 src-$(CONFIG_HAVE_GPIO) += initial_pins.c gpiocmds.c stepper.c endstop.c \
-    trsync.c prtouch_v2_compile.c
+    trsync.c prtouch_v2.c
 src-$(CONFIG_HAVE_PRTOUCH) += hx711s.c dirzctl.c
 src-$(CONFIG_HAVE_GPIO_ADC) += adccmds.c
 src-$(CONFIG_HAVE_GPIO_SPI) += spicmds.c thermocouple.c
