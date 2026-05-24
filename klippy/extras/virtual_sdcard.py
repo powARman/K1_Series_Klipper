@@ -426,7 +426,7 @@ class VirtualSD:
         except UnicodeDecodeError as err:
             logging.exception(err)
             # UnicodeDecodeError 'utf-8' codec can't decode byte 0xff in postion 5278: invalid start byte
-            err_msg = '{"code": "key572", "msg": "File UnicodeDecodeError"}'
+            err_msg = "File UnicodeDecodeError"
             self.gcode.respond_info(err_msg)
             raise self.printer.command_error(err_msg)
         except Exception as err:
@@ -682,7 +682,7 @@ class VirtualSD:
                     data = self.current_file.read(8192)
                 except UnicodeDecodeError as err:
                     logging.exception(err)
-                    err_msg = '{"code": "key571", "msg": "File UnicodeDecodeError"}'
+                    err_msg = "File UnicodeDecodeError"
                     self.gcode.respond_info(err_msg)
                     raise self.printer.command_error(err_msg)
                 except:

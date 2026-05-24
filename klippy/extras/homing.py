@@ -307,7 +307,7 @@ class PrinterHoming:
                         result = self.printer.lookup_object('probe').mcu_probe.run_G28_Z()
                         if not result:
                             gcode = self.printer.lookup_object('gcode')
-                            gcode.respond_info("""{"code": "key581", "msg":"Error during homing move", "values": []}""")
+                            gcode.respond_info("Error during homing move")
             else:
                 kin.home(homing_state)
         except self.printer.command_error:

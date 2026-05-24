@@ -491,7 +491,7 @@ class GCodeMove:
     def cmd_SET_POSITION(self, gcmd):
         toolhead = self.printer.lookup_object('toolhead', None)
         if toolhead is None:
-            raise gcmd.error("""{"code": "key283", "msg": ""Printer not ready"}""")
+            raise gcmd.error("Printer not ready")
         position = toolhead.get_position()
         x = position[0]
         y = position[1]

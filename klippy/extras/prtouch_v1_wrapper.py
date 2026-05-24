@@ -2190,7 +2190,7 @@ class PRTouchEndstopWrapper:
         x_dist = math.floor(x_dist * 100) / 100
         y_dist = math.floor(y_dist * 100) / 100
         if x_dist < 1. or y_dist < 1.:
-            raise self.printer.command_error("""{"code":"key555", "msg":"cmd_TRIG_BED_TEST bed_mesh: min/max points too close together", "values": []}""")
+            raise self.printer.command_error("cmd_TRIG_BED_TEST bed_mesh: min/max points too close together")
         # 按照路径计算采样点位置
         max_x = min_x + x_dist * (x_cnt - 1)
         pos_y = min_y

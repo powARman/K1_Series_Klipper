@@ -139,7 +139,7 @@ class Printer:
         if not os.path.exists(py_name) and not os.path.exists(py_dirname):
             if default is not configfile.sentinel:
                 return default
-            raise self.config_error("""{"code":"key124", "msg": "Unable to load module '%s'", "values": ["%s"]}""" % (section, section))
+            raise self.config_error("Unable to load module '%s'" % (section))
         mod = importlib.import_module('extras.' + module_name)
         init_func = 'load_config'
         if len(module_parts) > 1:
@@ -201,38 +201,8 @@ class Printer:
                     return
                 cb()
         except (self.config_error, pins.error) as e:
-            # logging.exception("Config error")^M
-            logging.error(e)
-            # self._set_state("%s\n%s" % (str(e), message_restart))^M
-            if '{"code":' in str(e):
-                try:
-                    import json
-                    tmp_state = eval(str(e))
-                    tmp_state["msg"] = tmp_state["msg"] + "\n" + message_restart
-                    self._set_state(json.dumps(tmp_state))
-                except Exception as e:
-                    logging.exception(e)
-                    self._set_state("%s\n%s" % (str(e), message_restart))
-            else:
-                if "File contains no section headers." in str(e):
-                    value = str(e)
-                    value = value.replace("File contains no section headers.", "").replace("'*\n'", "'*\\n'")
-
-                    msg = """{"code": "key336", "msg": "File contains no section headers.<br/>%s", "values":["%s"]}""" % (
-                        value, value
-                    )
-                    self._set_state(msg)
-                elif "File contains parsing errors:" in str(e):
-                    value = str(e)
-                    value = value.replace("File contains parsing errors:", "").replace("'*\n'", "'*\\n'")
-
-                    msg = """{"code": "key337", "msg": "File contains parsing errors:%s<br/>%s", "values":["%s"]}""" % (
-                        value, message_restart, value
-                    )
-                    self._set_state(msg)
-                else:
-                    self._set_state("%s\n%s" % (str(e), message_restart))
             logging.exception("Config error")
+            self._set_state("%s\n%s" % (str(e), message_restart))
             return
         except msgproto.error as e:
             logging.exception("Protocol error")
@@ -296,7 +266,6 @@ class Printer:
     def invoke_shutdown(self, msg):
         if self.in_shutdown_state:
             return
-        logging.info("+++++++++++++++invoke_shutdown")
         logging.error("Transition to shutdown state: %s", msg)
         self.in_shutdown_state = True
         self._set_state("%s%s" % (msg, message_shutdown))

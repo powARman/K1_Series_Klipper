@@ -246,7 +246,7 @@ class ShaperCalibrate:
         # Return results
         is_err, res = parent_conn.recv()
         if is_err:
-            raise self.error("""{"code": "key312", "msg": "Error in remote calculation: %s", "values":["%s"]}""" % (res,res))
+            raise self.error("Error in remote calculation: %s" % (res))
         calc_proc.join()
         parent_conn.close()
         return res
@@ -289,7 +289,7 @@ class ShaperCalibrate:
 
         if calibration_data is None:
             raise self.error(
-                    """{"code": "key313", "msg": "Internal error processing accelerometer data %s", "values":["%s"]}""" % (data,data))
+                    "Internal error processing accelerometer data %s" % (data))
         calibration_data.set_numpy(self.numpy)
         return calibration_data
 
