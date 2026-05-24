@@ -545,8 +545,6 @@ class GCodeIO:
         if self.pipe_is_active:
             try:
                 os.write(self.fd, (msg+"\n").encode())
-                # if 'key506' not in msg and 'key507' not in msg and 'key3"' not in msg and "key" in msg:
-                #     reportInformation(msg)
             except os.error:
                 logging.exception("Write g-code response")
                 self.pipe_is_active = False

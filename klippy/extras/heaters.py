@@ -222,7 +222,6 @@ class ControlBangBang:
                 self.prev_temp = 0.
                 self.temp_coff = 1.0
     def check_busy(self, eventtime, smoothed_temp, target_temp):
-
         return smoothed_temp < target_temp-self.max_delta
 
 
@@ -235,8 +234,6 @@ PID_SETTLE_SLOPE = .5
 
 class ControlPID:
     def __init__(self, heater, config):
-        self.printer = config.get_printer()
-        self.oldco = 0
         self.heater = heater
         self.heater_max_power = heater.get_max_power()
         self.Kp = config.getfloat('pid_Kp') / PID_PARAM_BASE
@@ -268,18 +265,6 @@ class ControlPID:
         #logging.debug("pid: %f@%.3f -> diff=%f deriv=%f err=%f integ=%f co=%d",
         #    temp, read_time, temp_diff, temp_deriv, temp_err, temp_integ, co)
         bounded_co = max(0., min(self.heater_max_power, co))
-       # self.powerpin = self.printer.lookup_object("power_pin")
-
-        # bounded_co = max(0., min(self.heater_max_power, co))
-        # if bounded_co == self.heater_max_power:
-        #     if self.oldco == 0:
-        #       #  self.powerpin.set_power_pin(0)
-        #         self.oldco = self.heater_max_power
-        #     else:
-        #         if self.oldco == self.heater_max_power:
-        #           #  self.powerpin.set_power_pin(1)
-        #
-        #         self.oldco = 0
         self.heater.set_pwm(read_time, bounded_co)
         # Store state for next measurement
         self.prev_temp = temp
@@ -288,11 +273,7 @@ class ControlPID:
         if co == bounded_co:
             self.prev_temp_integ = temp_integ
     def check_busy(self, eventtime, smoothed_temp, target_temp):
-
         temp_diff = target_temp - smoothed_temp
-
-
-
         return (abs(temp_diff) > PID_SETTLE_DELTA
                 or abs(self.prev_temp_deriv) > PID_SETTLE_SLOPE)
 
@@ -394,7 +375,6 @@ class PrinterHeaters:
     def turn_off_all_heaters(self, print_time=0.):
         for heater in self.heaters.values():
             heater.set_temp(0.)
-
     cmd_TURN_OFF_HEATERS_help = "Turn off all heaters"
     def cmd_TURN_OFF_HEATERS(self, gcmd):
         self.turn_off_all_heaters()

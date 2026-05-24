@@ -250,7 +250,6 @@ class PrinterHoming:
                     "Homing failed due to printer shutdown")
             raise
     def probing_move(self, mcu_probe, pos, speed):
-
         endstops = [(mcu_probe, "probe")]
         hmove = HomingMove(self.printer, endstops)
         try:

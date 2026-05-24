@@ -44,13 +44,11 @@ class PauseResume:
         self._setBootLoaderStateCmdOid = None
     def handle_connect(self):
         self.v_sd = self.printer.lookup_object('virtual_sdcard', None)
-        
     def _getBootLoaderVersion(self, web_request):
         mcu = self.printer.lookup_object('mcu')
         result = mcu.get_constants().get('software_version', '')
         web_request.send({'software_version': result})
         return {"software_version": result}
-    
     def _setBootLoaderState(self, web_request):
         mcu = self.printer.lookup_object('mcu')
         oid = mcu.create_oid() if not self._setBootLoaderStateCmdOid else self._setBootLoaderStateCmdOid
@@ -59,14 +57,12 @@ class PauseResume:
         # sendf("usrboot_ack oid=%c enter_boot_status=%c",args[0],status)
         result = mcu.lookup_query_command("jump_to_usrboot_query oid=%c", "usrboot_ack oid=%c enter_boot_status=%c", oid=oid).send()
         return {"result": result}
-
     def _set_print_first_layer_request(self, web_request): 
         self.v_sd.first_layer_stop = False
         self.v_sd.print_first_layer = False
         response = {"state": "success"}
         web_request.send(response)
         return response
-
     def _check_power_loss_state_request(self, web_request): 
         from subprocess import call
         response = {"file_state": False, "eeprom_state": False}
@@ -103,7 +99,6 @@ class PauseResume:
             os.remove(self.gcode.exclude_object_info)
         web_request.send(response)
         return response
-    
     def _handle_cancel_continue_print_request(self, web_request):
         from subprocess import call
         if os.path.exists(self.v_sd.print_file_name_path):

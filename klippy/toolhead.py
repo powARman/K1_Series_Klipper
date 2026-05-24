@@ -612,7 +612,6 @@ class ToolHead:
                 self.max_accel = qmode_max_accel
             else:
                 self.max_accel = max_accel
-            # gcmd.respond_info("SET_VELOCITY_LIMIT] self.max_accel={}".format(self.max_accel))
         if square_corner_velocity is not None:
             if square_corner_velocity > self.square_corner_max_velocity:
                 square_corner_velocity = self.square_corner_max_velocity
@@ -622,8 +621,6 @@ class ToolHead:
                 self.requested_accel_to_decel = qmode_max_accel_to_decel
             else:
                 self.requested_accel_to_decel = requested_accel_to_decel
-            # gcmd.respond_info("SET_VELOCITY_LIMIT] self.requested_accel_to_decel={}".format(self.requested_accel_to_decel))
-
         self._calc_junction_deviation()
         # msg = ("max_velocity: %.6f\n"
         #        "max_accel: %.6f\n"

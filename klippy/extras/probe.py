@@ -452,10 +452,6 @@ class ProbePointsHelper:
             raise gcmd.error("horizontal_move_z can't be less than"
                              " probe's z_offset")
         probe.multi_probe_begin()
-        # gcode = self.printer.lookup_object('gcode')
-        # g28_gcmd = gcode.create_gcode_command("G28", "G28", {'X': '0', 'Y': '0', 'Z': '0'})
-        # self.safe_z_home = self.printer.lookup_object('safe_z_home')
-        # self.safe_z_home.cmd_G28(g28_gcmd)
         while 1:
             done = self._move_next()
             if done:
