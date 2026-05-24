@@ -336,7 +336,7 @@ class VirtualSD:
             f.seek(0)
         except:
             logging.exception("virtual_sdcard file open")
-            raise gcmd.error("""{"code":"key121", "msg": "Unable to open file", "values": []}""")
+            raise gcmd.error("Unable to open file")
         gcmd.respond_raw("File opened:%s Size:%d" % (filename, fsize))
         gcmd.respond_raw("File selected")
         self.current_file = f

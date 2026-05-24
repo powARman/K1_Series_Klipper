@@ -10,7 +10,11 @@ import gcode, configfile, pins, mcu, toolhead, webhooks
 
 message_ready = "Printer is ready"
 
-message_startup = """{"code":"key3", "msg":"Printer is not ready The klippy host software is attempting to connect.  Please retry in a few moments."}"""
+message_startup = """
+Printer is not ready
+The klippy host software is attempting to connect.  Please
+retry in a few moments.
+"""
 
 message_restart = """
 Once the underlying issue is corrected, use the "RESTART"
@@ -19,9 +23,9 @@ Printer is halted
 """
 
 message_protocol_error1 = """
-This type of error is frequently caused by running an older
-version of the firmware on the micro-controller (fix by
-recompiling and flashing the firmware).
+This is frequently caused by running an older version of the
+firmware on the MCU(s). Fix by recompiling and flashing the
+firmware.
 """
 
 message_protocol_error2 = """
@@ -31,14 +35,14 @@ command to reload the config and restart the host software.
 
 message_mcu_connect_error = """
 Once the underlying issue is corrected, use the
-'FIRMWARE_RESTART' command to reset the firmware, reload the
+"FIRMWARE_RESTART" command to reset the firmware, reload the
 config, and restart the host software.
 Error configuring printer
 """
 
 message_shutdown = """
 Once the underlying issue is corrected, use the
-'FIRMWARE_RESTART' command to reset the firmware, reload the
+"FIRMWARE_RESTART" command to reset the firmware, reload the
 config, and restart the host software.
 Printer is shutdown
 """
@@ -84,13 +88,13 @@ class Printer:
     def add_object(self, name, obj):
         if name in self.objects:
             raise self.config_error(
-                """{"code":"key123", "msg": "Printer object '%s' already created", "values": ["%s"]}""" % (name, name))
+                "Printer object '%s' already created" % (name,))
         self.objects[name] = obj
     def lookup_object(self, name, default=configfile.sentinel):
         if name in self.objects:
             return self.objects[name]
         if default is configfile.sentinel:
-            raise self.config_error("""{"code":"key122", "msg": "Unknown config object '%s'", "values": ["%s"]}""" % (name, name))
+            raise self.config_error("Unknown config object '%s'" % (name,))
         return default
     def lookup_objects(self, module=None):
         if module is None:
@@ -113,7 +117,7 @@ class Printer:
         if not os.path.exists(py_name) and not os.path.exists(py_dirname):
             if default is not configfile.sentinel:
                 return default
-            raise self.config_error("""{"code":"key124", "msg": "Unable to load module '%s'", "values": ["%s"]}""" % (section, section))
+            raise self.config_error("Unable to load module '%s'" % (section,))
         mod = importlib.import_module('extras.' + module_name)
         init_func = 'load_config'
         if len(module_parts) > 1:
@@ -237,11 +241,7 @@ class Printer:
             return
         except mcu.error as e:
             logging.exception("MCU error during connect")
-            if '"msg"' in str(e):
-                json_msg = str(e)
-            else:
-                json_msg = '{"code":"key0", "msg":"%s%s"}' % (str(e), message_mcu_connect_error)
-            self._set_state(json_msg)
+            self._set_state("%s%s" % (str(e), message_mcu_connect_error))
             util.dump_mcu_build()
             return
         except Exception as e:
@@ -299,11 +299,7 @@ class Printer:
         logging.info("+++++++++++++++invoke_shutdown")
         logging.error("Transition to shutdown state: %s", msg)
         self.in_shutdown_state = True
-        if "{" in msg:
-            result = msg
-        else:
-            result = '{"code":"key1", "msg":"%s%s"}' % (msg, message_shutdown.replace('"',"'"))
-        self._set_state(result)
+        self._set_state("%s%s" % (msg, message_shutdown))
         for cb in self.event_handlers.get("klippy:shutdown", []):
             try:
                 cb()

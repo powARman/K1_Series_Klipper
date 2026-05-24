@@ -57,30 +57,7 @@ class Move:
         self.smooth_delta_v2 = min(self.smooth_delta_v2, self.delta_v2)
     def move_error(self, msg="Move out of range"):
         ep = self.end_pos
-        # m = "%s: %.3f %.3f %.3f [%.3f]" % (msg, ep[0], ep[1], ep[2], ep[3])
-        if msg == "Must home axis first":
-            code_key = "key95"
-        elif msg == "Must home first":
-            code_key = "key242"
-        elif msg == "Extrude when no extruder present":
-            code_key = "key114"
-        else:
-            code_key = "key243"
-            min_x = self.toolhead.config.getsection('stepper_x').getfloat('position_min', default=-2)
-            max_x = self.toolhead.config.getsection('stepper_x').getfloat('position_max', default=300)  
-            min_y = self.toolhead.config.getsection('stepper_y').getfloat('position_min', default=-2)      
-            max_y = self.toolhead.config.getsection('stepper_y').getfloat('position_max', default=300)        
-            min_z = self.toolhead.config.getsection('stepper_z').getfloat('position_min', default=-10) 
-            max_z = self.toolhead.config.getsection('stepper_z').getfloat('position_max', default=300)        
-            if min_x > ep[0] or ep[0] > max_x:
-                code_key = "key585"
-            elif min_y > ep[1] or ep[1] > max_y:
-                code_key = "key586"
-            elif min_z > ep[2] or ep[2] > max_z:
-                code_key = "key587"
-            logging.info("stepper xyz min_x:%s max_x:%s|min_y:%s max_y:%s|min_z:%s max_z:%s" % (min_x, max_x, min_y, max_y, min_z, max_z))
-        m = """{"code":"%s","msg":"%s: %.3f %.3f %.3f [%.3f]", "values":[%.3f, %.3f, %.3f, %.3f]}""" % (
-            code_key, msg, ep[0], ep[1], ep[2], ep[3], ep[0], ep[1], ep[2], ep[3])
+        m = "%s: %.3f %.3f %.3f [%.3f]" % (msg, ep[0], ep[1], ep[2], ep[3])
         return self.toolhead.printer.command_error(m)
     def calc_junction(self, prev_move):
         if not self.is_kinematic_move or not prev_move.is_kinematic_move:
@@ -675,8 +652,8 @@ class ToolHead:
             p = gcmd.get_float('P', None, above=0.)
             t = gcmd.get_float('T', None, above=0.)
             if p is None or t is None:
-                gcmd.respond_info("""{"code":"key73", "msg": "Invalid M204 command "%s"", "values": ["%s"]}"""
-                                  % (gcmd.get_commandline(),gcmd.get_commandline()))
+                gcmd.respond_info('Invalid M204 command "%s"'
+                                  % (gcmd.get_commandline(),))
                 return
             accel = min(p, t)
             cmd = "M204 P%s T%s" % (p, t)
