@@ -93,7 +93,6 @@ class BedMesh:
         self.last_position = [0., 0., 0., 0.]
         self.bmc = BedMeshCalibrate(config, self)
         self.z_mesh = None
-        self.z_mesh_bak = None
         self.toolhead = None
         self.horizontal_move_z = config.getfloat('horizontal_move_z', 5.)
         self.fade_start = config.getfloat('fade_start', 1.)
@@ -123,12 +122,6 @@ class BedMesh:
         self.gcode.register_command(
             'BED_MESH_OFFSET', self.cmd_BED_MESH_OFFSET,
             desc=self.cmd_BED_MESH_OFFSET_help)
-        self.gcode.register_command(
-            'BED_MESH_SAVE', self.cmd_BED_MESH_SAVE,
-            desc=self.cmd_BED_MESH_SAVE_help)
-        self.gcode.register_command(
-            'BED_MESH_RESTORE', self.cmd_BED_MESH_RESTORE,
-            desc=self.cmd_BED_MESH_RESTORE_help)
         webhooks = self.printer.lookup_object('webhooks')
         webhooks.register_endpoint("get_mesh", self._get_mesh)
         webhooks.register_endpoint("update_mesh", self.update_mesh)
@@ -305,13 +298,6 @@ class BedMesh:
             gcode_move.reset_last_position()
         else:
             gcmd.respond_info("No mesh loaded to offset")
-    cmd_BED_MESH_SAVE_help = "Save the Mesh to bak"
-    def cmd_BED_MESH_SAVE(self, gcmd):
-        if self.z_mesh is not None:
-            self.z_mesh_bak = self.z_mesh
-    cmd_BED_MESH_RESTORE_help = "Restore the bak Mesh to Mesh"
-    def cmd_BED_MESH_RESTORE(self, gcmd):
-        self.set_mesh(self.z_mesh_bak)
 
 
 class BedMeshCalibrate:
