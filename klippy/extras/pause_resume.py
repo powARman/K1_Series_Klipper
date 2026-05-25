@@ -3,7 +3,6 @@
 # Copyright (C) 2019  Eric Callahan <arksine.code@gmail.com>
 #
 # This file may be distributed under the terms of the GNU GPLv3 license.
-import os, json, logging
 
 class PauseResume:
     def __init__(self, config):
@@ -14,7 +13,6 @@ class PauseResume:
         self.is_paused = False
         self.sd_paused = False
         self.pause_command_sent = False
-        self.config = config
         self.printer.register_event_handler("klippy:connect",
                                             self.handle_connect)
         self.gcode.register_command("PAUSE", self.cmd_PAUSE,
@@ -34,7 +32,6 @@ class PauseResume:
                                    self._handle_resume_request)
         webhooks.register_endpoint("getBootLoaderVersion",
                                    self._getBootLoaderVersion)
-        self._setBootLoaderStateCmdOid = None
     def handle_connect(self):
         self.v_sd = self.printer.lookup_object('virtual_sdcard', None)
     def _getBootLoaderVersion(self, web_request):
@@ -42,14 +39,6 @@ class PauseResume:
         result = mcu.get_constants().get('software_version', '')
         web_request.send({'software_version': result})
         return {"software_version": result}
-    def _setBootLoaderState(self, web_request):
-        mcu = self.printer.lookup_object('mcu')
-        oid = mcu.create_oid() if not self._setBootLoaderStateCmdOid else self._setBootLoaderStateCmdOid
-        self._setBootLoaderStateCmdOid = oid
-        mcu.add_config_cmd("config_usrboot oid=%d" % (oid,))
-        # sendf("usrboot_ack oid=%c enter_boot_status=%c",args[0],status)
-        result = mcu.lookup_query_command("jump_to_usrboot_query oid=%c", "usrboot_ack oid=%c enter_boot_status=%c", oid=oid).send()
-        return {"result": result}
     def _handle_cancel_request(self, web_request):
         self.gcode.run_script("CANCEL_PRINT")
     def _handle_pause_request(self, web_request):
