@@ -6,7 +6,6 @@
 import os, logging, io, json, time
 
 VALID_GCODE_EXTS = ['gcode', 'g', 'gco']
-LAYER_KEYS = ["; layer #", ";LAYER:", "; layer:", "; LAYER:", ";AFTER_LAYER_CHANGE", ";LAYER_CHANGE", "; CHANGE_LAYER"]
 
 class VirtualSD:
     def __init__(self, config):
@@ -44,12 +43,10 @@ class VirtualSD:
         self.count_line = 0
         self.print_file_name_path = "/usr/data/creality/userdata/config/print_file_name.json"
         self.count_M204 = 0
-        self.layer = 0
         self.layer_count = 0
         self.run_dis = 0.0
         self.print_id = ""
         self.cur_print_data = {}
-        self.layer_key = ""
     def handle_shutdown(self):
         if self.work_timer is not None:
             self.must_pause_work = True
@@ -101,7 +98,6 @@ class VirtualSD:
             'is_active': self.is_active(),
             'file_position': self.file_position,
             'file_size': self.file_size,
-            'layer': self.layer,
             'layer_count': self.layer_count,
             'run_dis': self.run_dis
         }
@@ -129,7 +125,6 @@ class VirtualSD:
             self.work_handler, self.reactor.NOW)
     def do_cancel(self):
         self.count_M204 = 0
-        self.layer = 0
         self.layer_count = 0
         if self.current_file is not None:
             self.do_pause()
@@ -169,7 +164,6 @@ class VirtualSD:
         "include files in subdirectories."
     def cmd_SDCARD_PRINT_FILE(self, gcmd):
         self.print_id = ""
-        self.layer_key = ""
         if self.work_timer is not None:
             raise gcmd.error("SD busy")
         self._reset_file()
@@ -386,7 +380,6 @@ class VirtualSD:
                     if os.path.exists(self.gcode.exclude_object_info):
                         os.remove(self.gcode.exclude_object_info)
                     self.count_M204 = 0
-                    self.layer = 0
                     self.layer_count = 0
                     self.update_print_history_info(only_update_status=True, state="completed")
                     time.sleep(0.3)
@@ -416,13 +409,6 @@ class VirtualSD:
                         os.remove(self.print_file_name_path)
                     if os.path.exists(self.gcode.exclude_object_info):
                         os.remove(self.gcode.exclude_object_info)
-                for layer_key in LAYER_KEYS:
-                    if line.startswith(layer_key):
-                        if not self.layer_key:
-                            self.layer_key = layer_key
-                        if line.startswith(self.layer_key):
-                            self.layer += 1
-                        break
                 self.gcode.run_script(line)
                 self.count_line += 1
             except self.gcode.error as e:
@@ -431,12 +417,10 @@ class VirtualSD:
                     self.gcode.run_script(self.on_error_gcode.render())
                 except:
                     logging.exception("virtual_sdcard on_error")
-                self.layer = 0
                 self.layer_count = 0
                 break
             except:
                 logging.exception("virtual_sdcard dispatch")
-                self.layer = 0
                 self.layer_count = 0
                 break
             self.cmd_from_sd = False
