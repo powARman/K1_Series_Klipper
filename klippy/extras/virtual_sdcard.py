@@ -41,9 +41,7 @@ class VirtualSD:
         self.gcode.register_command(
             "SDCARD_PRINT_FILE", self.cmd_SDCARD_PRINT_FILE,
             desc=self.cmd_SDCARD_PRINT_FILE_help)
-        self.count_G1 = 0 
         self.count_line = 0
-        self.user_print_refer_path = "/usr/data/creality/userdata/config/user_print_refer.json"
         self.print_file_name_path = "/usr/data/creality/userdata/config/print_file_name.json"
         self.count_M204 = 0
         self.layer = 0
@@ -347,23 +345,6 @@ class VirtualSD:
         import time
         from subprocess import check_output
         self.count_line = 0
-        self.count_G1 = 0 
-        try:
-            if os.path.exists(self.user_print_refer_path):
-                with open(self.user_print_refer_path, "r") as f:
-                    data = json.loads(f.read())
-                    delay_photography_switch = data.get("delay_image", {}).get("switch", 1)
-                    location = data.get("delay_image", {}).get("location", 0)
-                    frame = data.get("delay_image", {}).get("frame", 15)
-                    interval = data.get("delay_image", {}).get("interval", 1)
-        except Exception as err:
-            delay_photography_switch = 1
-            location = 0
-            frame = 15
-            interval = 1
-        logging.info("delay_photography status: delay_photography_switch:%s, location:%s, frame:%s, interval:%s" % (
-            delay_photography_switch, location, frame, interval
-        ))
         try:
             self.gcode.run_script("G90")
         except Exception as err:
@@ -381,11 +362,6 @@ class VirtualSD:
         partial_input = ""
         lines = []
         error_message = None
-        lastE = 0
-        layer_count = 0
-        # self.gcode.run_script("G90")
-        toolhead = self.printer.lookup_object('toolhead')
-        start_time = interval_start_time = self.reactor.monotonic()
         while not self.must_pause_work:
             if not lines:
                 # Read more data
@@ -432,18 +408,10 @@ class VirtualSD:
             line = lines.pop()
             next_file_position = self.file_position + len(line) + 1
             self.next_file_position = next_file_position
-            end_time = interval_end_time = self.reactor.monotonic()
             if self.count_line % 4999 == 0:
                 self.update_print_history_info()
             try:
-                if line.startswith("G1") and "E" in line:
-                    try:
-                        E_str = line.split(" ")[-1]
-                        if E_str.startswith("E"):
-                            lastE = float(E_str.strip("\r").strip("\n")[1:])
-                    except Exception as err:
-                        pass
-                elif line.startswith("END_PRINT"):
+                if line.startswith("END_PRINT"):
                     if os.path.exists(self.print_file_name_path):
                         os.remove(self.print_file_name_path)
                     if os.path.exists(self.gcode.exclude_object_info):
@@ -455,81 +423,8 @@ class VirtualSD:
                         if line.startswith(self.layer_key):
                             self.layer += 1
                         break
-                if delay_photography_switch:
-                    for layer_key in LAYER_KEYS:
-                        if ";LAYER_COUNT:" in layer_key:
-                            break
-                        if line.startswith(layer_key) and os.path.exists("/tmp/camera_main"):
-                            if layer_count % int(interval) == 0:
-                                if location:
-                                    cmd_wait_for_stepper = "M400"
-                                    # toolhead = self.printer.lookup_object('toolhead')
-                                    X, Y, Z, E = toolhead.get_position()
-                                    if self.count_G1 >= 20:
-                                        # 1. Pull back and lift first
-                                        logging.info("G1 F2400 E%s" % (lastE-3))
-                                        logging.info(cmd_wait_for_stepper)
-                                        self.gcode.run_script("G1 F2400 E%s" % (lastE-3))
-                                        self.gcode.run_script(cmd_wait_for_stepper)
-                                        time.sleep(0.1)
-                                        self.gcode.run_script("G1 F3000 Z%s" % (Z + 2))
-                                        self.gcode.run_script(cmd_wait_for_stepper)
-                                        time.sleep(0.1)
-                                        # 2. move to the specified position
-                                        cmd = "G0 X5 Y150 F15000"
-                                        logging.info(cmd)
-                                        logging.info(cmd_wait_for_stepper)
-                                        self.gcode.run_script(cmd)
-                                        self.gcode.run_script(cmd_wait_for_stepper)
-                                        try:
-                                            capture_shell = "capture 0"
-                                            logging.info(capture_shell)
-                                            capture_ret = check_output(capture_shell, shell=True).decode("utf-8")
-                                            logging.info("capture 0 return:#%s#" % str(capture_ret))
-                                        except Exception as err:
-                                            logging.error(err)
-                                        time.sleep(0.1)
-                                        # 3. move back
-                                        move_back_cmd = "G0 X%s Y%s F15000" % (X, Y)
-                                        logging.info(move_back_cmd)
-                                        logging.info(cmd_wait_for_stepper)
-                                        self.gcode.run_script(move_back_cmd)
-                                        self.gcode.run_script(cmd_wait_for_stepper)
-                                        time.sleep(0.2)
-                                        self.gcode.run_script("G1 F3000 Z%s" % Z)
-                                        self.gcode.run_script(cmd_wait_for_stepper)
-                                        time.sleep(0.1)
-                                        logging.info("G1 F2400 E%s" % (lastE))
-                                        self.gcode.run_script("G1 F2400 E%s" % (lastE))
-                                else:
-                                    try:
-                                        capture_shell = "capture 0"
-                                        logging.info(capture_shell)
-                                        capture_ret = check_output(capture_shell, shell=True).decode("utf-8")
-                                        logging.info("capture 0 return:#%s#" % str(capture_ret))
-                                    except Exception as err:
-                                        logging.error(err)
-                            layer_count += 1
-                            break
-                if line.startswith("END_PRINT") and delay_photography_switch and os.path.exists("/tmp/camera_main"):
-                    self.gcode.run_script("END_PRINT_POINT_WITHOUT_LIFTING")
-                    self.gcode.run_script("M400")
-                    interval_time = 1.0 / frame
-                    start_time = 1
-                    while start_time > 0:
-                        try:
-                            capture_shell = "capture 0"
-                            logging.info(capture_shell)
-                            capture_ret = check_output(capture_shell, shell=True).decode("utf-8")
-                            logging.info("capture 0 return:#%s#" % str(capture_ret))
-                        except Exception as err:
-                            logging.error(err)
-                        time.sleep(interval_time)
-                        start_time = start_time - interval_time
                 self.gcode.run_script(line)
                 self.count_line += 1
-                if self.count_G1 < 20 and line.startswith("G1"):
-                    self.count_G1 += 1
             except self.gcode.error as e:
                 error_message = str(e)
                 try:
@@ -558,7 +453,6 @@ class VirtualSD:
                 partial_input = ""
         logging.info("Exiting SD card print (position %d)", self.file_position)
         self.count_line = 0
-        self.count_G1 = 0
         self.work_timer = None
         self.cmd_from_sd = False
         if error_message is not None:
