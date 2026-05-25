@@ -26,8 +26,6 @@ class PauseResume:
         self.gcode.register_command("CANCEL_PRINT", self.cmd_CANCEL_PRINT,
                                     desc=self.cmd_CANCEL_PRINT_help)
         webhooks = self.printer.lookup_object('webhooks')
-        webhooks.register_endpoint("pause_resume/set_print_first_layer",
-                                   self._set_print_first_layer_request)
         webhooks.register_endpoint("pause_resume/cancel",
                                    self._handle_cancel_request)
         webhooks.register_endpoint("pause_resume/pause",
@@ -52,12 +50,6 @@ class PauseResume:
         # sendf("usrboot_ack oid=%c enter_boot_status=%c",args[0],status)
         result = mcu.lookup_query_command("jump_to_usrboot_query oid=%c", "usrboot_ack oid=%c enter_boot_status=%c", oid=oid).send()
         return {"result": result}
-    def _set_print_first_layer_request(self, web_request): 
-        self.v_sd.first_layer_stop = False
-        self.v_sd.print_first_layer = False
-        response = {"state": "success"}
-        web_request.send(response)
-        return response
     def _handle_cancel_request(self, web_request):
         self.gcode.run_script("CANCEL_PRINT")
     def _handle_pause_request(self, web_request):

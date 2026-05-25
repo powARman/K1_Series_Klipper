@@ -45,8 +45,6 @@ class VirtualSD:
         self.count_line = 0
         self.user_print_refer_path = "/usr/data/creality/userdata/config/user_print_refer.json"
         self.print_file_name_path = "/usr/data/creality/userdata/config/print_file_name.json"
-        self.print_first_layer = False
-        self.first_layer_stop = False
         self.count_M204 = 0
         self.layer = 0
         self.layer_count = 0
@@ -68,8 +66,6 @@ class VirtualSD:
             logging.info("Virtual sdcard (%d): %s\nUpcoming (%d): %s",
                          readpos, repr(data[:readcount]),
                          self.file_position, repr(data[readcount:]))
-        self.print_first_layer = False
-        self.first_layer_stop = False
         self.count_M204 = 0
     def stats(self, eventtime):
         if self.work_timer is None:
@@ -107,7 +103,6 @@ class VirtualSD:
             'is_active': self.is_active(),
             'file_position': self.file_position,
             'file_size': self.file_size,
-            'first_layer_stop':  self.first_layer_stop,
             'layer': self.layer,
             'layer_count': self.layer_count,
             'run_dis': self.run_dis
@@ -135,8 +130,6 @@ class VirtualSD:
         self.work_timer = self.reactor.register_timer(
             self.work_handler, self.reactor.NOW)
     def do_cancel(self):
-        self.first_layer_stop = False
-        self.print_first_layer = False
         self.count_M204 = 0
         self.layer = 0
         self.layer_count = 0
@@ -183,11 +176,6 @@ class VirtualSD:
             raise gcmd.error("SD busy")
         self._reset_file()
         filename = gcmd.get("FILENAME")
-        first_floor = gcmd.get("FIRST_FLOOR_PRINT", None)
-        if first_floor is None or first_floor == False:
-            self.print_first_layer = False
-        else:
-            self.print_first_layer = True
         if filename[0] == '/':
             filename = filename[1:]
         self._load_file(gcmd, filename, check_subdirs=True)
@@ -421,8 +409,6 @@ class VirtualSD:
                         os.remove(self.print_file_name_path)
                     if os.path.exists(self.gcode.exclude_object_info):
                         os.remove(self.gcode.exclude_object_info)
-                    self.first_layer_stop = False
-                    self.print_first_layer = False
                     self.count_M204 = 0
                     self.layer = 0
                     self.layer_count = 0
@@ -469,13 +455,6 @@ class VirtualSD:
                         if line.startswith(self.layer_key):
                             self.layer += 1
                         break
-                if self.print_first_layer and self.count_G1 >= 20:
-                    for layer_key in LAYER_KEYS:
-                        if line.startswith(layer_key):
-                            logging.info("print_first_layer layer_key:%s" % layer_key)
-                            X, Y, Z, E = toolhead.get_position()
-                            self.gcode.run_script("FIRST_FLOOR_PAUSE")
-                            self.first_layer_stop = True
                 if delay_photography_switch:
                     for layer_key in LAYER_KEYS:
                         if ";LAYER_COUNT:" in layer_key:
