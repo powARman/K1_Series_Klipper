@@ -199,7 +199,6 @@ class DripModeEndSignal(Exception):
 class ToolHead:
     def __init__(self, config):
         self.config = config
-        self.qmode_flag = 0
         self.printer = config.get_printer()
         self.reactor = self.printer.get_reactor()
         self.all_mcus = [
@@ -584,21 +583,6 @@ class ToolHead:
         self.wait_moves()
     cmd_SET_VELOCITY_LIMIT_help = "Set printer velocity limits"
     def cmd_SET_VELOCITY_LIMIT(self, gcmd):
-
-        qmode_max_accel = 0
-        qmode_max_accel_to_decel = 0
-
-        custom_macro = self.printer.lookup_object('custom_macro')
-        self.qmode_flag = custom_macro.qmode_flag
-
-        if self.config.has_section('gcode_macro Qmode'):
-            Qmode = self.config.getsection('gcode_macro Qmode')
-            qmode_max_accel = Qmode.getfloat('variable_max_accel')
-            qmode_max_accel_to_decel = Qmode.getfloat('variable_max_accel_to_decel')
-            # gcmd.respond_info("SET_VELOCITY_LIMIT] qmode_flag={}".format(self.qmode_flag))
-            # gcmd.respond_info("SET_VELOCITY_LIMIT] qmode_max_accel={}".format(qmode_max_accel))
-            # gcmd.respond_info("SET_VELOCITY_LIMIT] qmode_max_accel_to_decel={}".format(qmode_max_accel_to_decel))
-
         max_velocity = gcmd.get_float('VELOCITY', None, above=0.)
         max_accel = gcmd.get_float('ACCEL', None, above=0.)
         square_corner_velocity = gcmd.get_float(
@@ -608,28 +592,22 @@ class ToolHead:
         if max_velocity is not None:
             self.max_velocity = max_velocity
         if max_accel is not None:
-            if self.qmode_flag and max_accel > qmode_max_accel:
-                self.max_accel = qmode_max_accel
-            else:
-                self.max_accel = max_accel
+            self.max_accel = max_accel
         if square_corner_velocity is not None:
             if square_corner_velocity > self.square_corner_max_velocity:
                 square_corner_velocity = self.square_corner_max_velocity
             self.square_corner_velocity = square_corner_velocity
         if requested_accel_to_decel is not None:
-            if self.qmode_flag and requested_accel_to_decel > qmode_max_accel_to_decel:
-                self.requested_accel_to_decel = qmode_max_accel_to_decel
-            else:
-                self.requested_accel_to_decel = requested_accel_to_decel
+            self.requested_accel_to_decel = requested_accel_to_decel
         self._calc_junction_deviation()
-        # msg = ("max_velocity: %.6f\n"
-        #        "max_accel: %.6f\n"
-        #        "max_accel_to_decel: %.6f\n"
-        #        "square_corner_velocity: %.6f" % (
-        #            self.max_velocity, self.max_accel,
-        #            self.requested_accel_to_decel,
-        #            self.square_corner_velocity))
-        # self.printer.set_rollover_info("toolhead", "toolhead: %s" % (msg,))
+        msg = ("max_velocity: %.6f\n"
+               "max_accel: %.6f\n"
+               "max_accel_to_decel: %.6f\n"
+               "square_corner_velocity: %.6f" % (
+                   self.max_velocity, self.max_accel,
+                   self.requested_accel_to_decel,
+                   self.square_corner_velocity))
+        self.printer.set_rollover_info("toolhead", "toolhead: %s" % (msg,))
         if (max_velocity is None and
             max_accel is None and
             square_corner_velocity is None and
