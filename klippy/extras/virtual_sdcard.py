@@ -3,7 +3,7 @@
 # Copyright (C) 2018  Kevin O'Connor <kevin@koconnor.net>
 #
 # This file may be distributed under the terms of the GNU GPLv3 license.
-import os, logging, io, json, time
+import os, logging, io
 
 VALID_GCODE_EXTS = ['gcode', 'g', 'gco']
 
@@ -40,13 +40,9 @@ class VirtualSD:
         self.gcode.register_command(
             "SDCARD_PRINT_FILE", self.cmd_SDCARD_PRINT_FILE,
             desc=self.cmd_SDCARD_PRINT_FILE_help)
-        self.count_line = 0
         self.print_file_name_path = "/usr/data/creality/userdata/config/print_file_name.json"
         self.count_M204 = 0
-        self.layer_count = 0
         self.run_dis = 0.0
-        self.print_id = ""
-        self.cur_print_data = {}
     def handle_shutdown(self):
         if self.work_timer is not None:
             self.must_pause_work = True
@@ -98,7 +94,6 @@ class VirtualSD:
             'is_active': self.is_active(),
             'file_position': self.file_position,
             'file_size': self.file_size,
-            'layer_count': self.layer_count,
             'run_dis': self.run_dis
         }
     def file_path(self):
@@ -125,7 +120,6 @@ class VirtualSD:
             self.work_handler, self.reactor.NOW)
     def do_cancel(self):
         self.count_M204 = 0
-        self.layer_count = 0
         if self.current_file is not None:
             self.do_pause()
             self.current_file.close()
@@ -138,10 +132,6 @@ class VirtualSD:
         if os.path.exists(self.gcode.exclude_object_info):
             os.remove(self.gcode.exclude_object_info)
         call("sync", shell=True)
-        self.update_print_history_info(only_update_status=True, state="cancelled")
-        if self.print_id and self.cur_print_data:
-            self.print_id = ""
-            self.cur_print_data = {}
     # G-Code commands
     def cmd_error(self, gcmd):
         raise gcmd.error("SD write not supported")
@@ -163,7 +153,6 @@ class VirtualSD:
     cmd_SDCARD_PRINT_FILE_help = "Loads a SD file and starts the print.  May "\
         "include files in subdirectories."
     def cmd_SDCARD_PRINT_FILE(self, gcmd):
-        self.print_id = ""
         if self.work_timer is not None:
             raise gcmd.error("SD busy")
         self._reset_file()
@@ -171,69 +160,7 @@ class VirtualSD:
         if filename[0] == '/':
             filename = filename[1:]
         self._load_file(gcmd, filename, check_subdirs=True)
-        self.record_print_history(str(self.current_file.name))
         self.do_resume()
-
-    def record_print_history(self, file_path=""):
-        try:
-            if os.path.exists(file_path):
-                dir_path = os.path.dirname(file_path)
-                file_name = os.path.basename(file_path)
-                metadata_info = self.get_print_file_metadata(filename=file_name, filepath=dir_path)
-                self.layer_count = self.get_file_layer_count(self.current_file.name, metadata_info=metadata_info)
-                start_time = time.time()
-                self.print_id = str(start_time)
-                metadata = metadata_info.get("metadata", {})
-                data = {
-                    "end_time": start_time,
-                    "filament_used": 0,
-                    "filename": file_name,
-                    "metadata": metadata,
-                    "print_duration": 0,
-                    "start_time": start_time,
-                    "status": "in_progress",
-                    "total_duration": 0,
-                }
-                result = {"count": 1, "jobs": [data]}
-                self.cur_print_data = result
-                return
-        except Exception as err:
-            logging.error(err)
-
-    def update_print_history_info(self, only_update_status=False, state="", error_msg=""):
-        if self.print_id:
-            ret = {}
-            try:
-                update_obj = None
-                index = -1
-                ret = self.cur_print_data
-                if ret and ret.get("jobs", []):
-                    print_list = ret.get("jobs", [])
-                    for obj in print_list:
-                        if obj.get("start_time", "") and str(obj.get("start_time", "")) == self.print_id:
-                            index = print_list.index(obj)
-                            update_obj = obj
-                            if not only_update_status:
-                                update_obj["filament_used"] = self.print_stats.filament_used
-                                update_obj["print_duration"] = self.print_stats.print_duration
-                                update_obj["total_duration"] = self.print_stats.total_duration
-                            update_obj["end_time"] = time.time()
-                            if not state:
-                                state = "in_progress"
-                            if error_msg:
-                                update_obj["error_msg"] = error_msg
-                            update_obj["status"] = state
-                            if only_update_status and self.print_id and (state == "error" or state == "completed") and os.path.exists("/tmp/camera_main"):
-                                update_obj["jpg_filename"] = "%s.jpg" % self.print_id
-                                time.sleep(0.5)
-
-                if index != -1:
-                    print_list[index] = update_obj
-                    ret["jobs"] = print_list
-                    self.cur_print_data = ret
-            except Exception as err:
-                logging.error(err)
-
     def cmd_M20(self, gcmd):
         # List SD card
         files = self.get_file_list()
@@ -300,37 +227,6 @@ class VirtualSD:
         self.next_file_position = pos
     def is_cmd_from_sd(self):
         return self.cmd_from_sd
-    def get_print_file_metadata(self, filename, filepath="/usr/data/printer_data/gcodes"):
-        from subprocess import check_output
-        result = {}
-        python_env = "/usr/share/klippy-env/bin/python3"
-        # -f gcode filename  -p gcode file dir
-        cmd = "%s /usr/share/klipper/klippy/extras/metadata.py -f '%s' -p %s" % (python_env, filename, filepath)
-        try:
-            result = json.loads(check_output(cmd, shell=True).decode("utf-8"))
-        except Exception as err:
-            logging.error(err)
-        return result
-    def get_file_layer_count(self, filename, metadata_info=None):
-        filename = filename.split("/")[-1]
-        import math
-        layer_count = 0
-        if metadata_info:
-            result = metadata_info
-        else:
-            result = self.get_print_file_metadata(filename, get_layer_count=True)
-        if not result:
-            return layer_count
-        try:
-            layer_count = result.get("metadata").get("layer_count", 0)
-            first_layer_height = result.get("metadata").get("first_layer_height", 0)
-            object_height = result.get("metadata").get("object_height", 0)
-            layer_height = result.get("metadata").get("layer_height", 0)
-            if not layer_count and object_height > 0 and layer_height > 0:
-                layer_count = math.ceil((object_height - first_layer_height) / layer_height + 1)
-        except Exception as err:
-            logging.error(err)
-        return layer_count
     # Background work timer
     def work_handler(self, eventtime):
         filename = os.path.basename(self.current_file.name) if self.current_file else ""
@@ -338,7 +234,6 @@ class VirtualSD:
         # self.print_stats.note_start()
         import time
         from subprocess import check_output
-        self.count_line = 0
         try:
             self.gcode.run_script("G90")
         except Exception as err:
@@ -380,11 +275,7 @@ class VirtualSD:
                     if os.path.exists(self.gcode.exclude_object_info):
                         os.remove(self.gcode.exclude_object_info)
                     self.count_M204 = 0
-                    self.layer_count = 0
-                    self.update_print_history_info(only_update_status=True, state="completed")
                     time.sleep(0.3)
-                    self.cur_print_data = {}
-                    self.print_id = ""
                     break
                 lines = data.split('\n')
                 lines[0] = partial_input + lines[0]
@@ -401,8 +292,6 @@ class VirtualSD:
             line = lines.pop()
             next_file_position = self.file_position + len(line) + 1
             self.next_file_position = next_file_position
-            if self.count_line % 4999 == 0:
-                self.update_print_history_info()
             try:
                 if line.startswith("END_PRINT"):
                     if os.path.exists(self.print_file_name_path):
@@ -410,18 +299,15 @@ class VirtualSD:
                     if os.path.exists(self.gcode.exclude_object_info):
                         os.remove(self.gcode.exclude_object_info)
                 self.gcode.run_script(line)
-                self.count_line += 1
             except self.gcode.error as e:
                 error_message = str(e)
                 try:
                     self.gcode.run_script(self.on_error_gcode.render())
                 except:
                     logging.exception("virtual_sdcard on_error")
-                self.layer_count = 0
                 break
             except:
                 logging.exception("virtual_sdcard dispatch")
-                self.layer_count = 0
                 break
             self.cmd_from_sd = False
             self.file_position = self.next_file_position
@@ -436,7 +322,6 @@ class VirtualSD:
                 lines = []
                 partial_input = ""
         logging.info("Exiting SD card print (position %d)", self.file_position)
-        self.count_line = 0
         self.work_timer = None
         self.cmd_from_sd = False
         if error_message is not None:
