@@ -102,14 +102,6 @@ class PauseResume:
             % (velocity))
         self.send_resume_command()
         self.is_paused = False
-        result = {}
-        if os.path.exists(self.v_sd.print_file_name_path):
-            with open(self.v_sd.print_file_name_path, "r") as f:
-                result = (json.loads(f.read()))
-                result["variable_z_safe_pause"] = 0
-            with open(self.v_sd.print_file_name_path, "w") as f:
-                f.write(json.dumps(result))
-                f.flush()
     cmd_CLEAR_PAUSE_help = (
         "Clears the current paused state without resuming the print")
     def cmd_CLEAR_PAUSE(self, gcmd):

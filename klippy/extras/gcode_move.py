@@ -7,10 +7,6 @@ import logging
 
 class GCodeMove:
     def __init__(self, config):
-        self.variable_safe_z = 0
-        if config.has_section('gcode_macro PRINTER_PARAM'):
-            PRINTER_PARAM = config.getsection('gcode_macro PRINTER_PARAM')
-            self.variable_safe_z = PRINTER_PARAM.getfloat('variable_z_safe_g28', 0.0)
         self.printer = printer = config.get_printer()
         printer.register_event_handler("klippy:ready", self._handle_ready)
         printer.register_event_handler("klippy:shutdown", self._handle_shutdown)
@@ -211,60 +207,6 @@ class GCodeMove:
             for pos, delta in enumerate(move_delta):
                 self.last_position[pos] += delta
             self.move_with_transform(self.last_position, speed)
-    def recordPrintFileName(self, path, file_name, fan_state={}, filament_used=0, last_print_duration=0, pressure_advance=""):
-        import json, os
-        fan = {}
-        M204_accel = ""
-        old_filament_used = 0
-        old_last_print_duration = 0
-        old_pressure_advance = ""
-        set_gcode_offset = -5
-        if os.path.exists(path):
-            with open(path, "r") as f:
-                result = (json.loads(f.read()))
-                # fan = result.get("fan_state", "")
-                fan = result.get("fan_state", {})
-                M204_accel = result.get("M204", "")
-                old_filament_used = result.get("filament_used", 0)
-                old_last_print_duration = result.get("last_print_duration", 0)
-                set_gcode_offset = result.get("SET_GCODE_OFFSET", -5)
-                old_pressure_advance = result.get("pressure_advance", "")
-        if fan_state.get("M106 S") and fan_state.get("M106 S", "") != fan.get("M106 S", ""):
-            fan["M106 S"] = fan_state.get("M106 S")
-        elif fan_state.get("M106 P0") and fan_state.get("M106 P0", "") != fan.get("M106 P0", ""):
-            fan["M106 P0"] = fan_state.get("M106 P0")
-        elif fan_state.get("M106 P1")  and fan_state.get("M106 P1", "") != fan.get("M106 P1", ""):
-            fan["M106 P1"] = fan_state.get("M106 P1")
-        elif fan_state.get("M106 P2")  and fan_state.get("M106 P2", "") != fan.get("M106 P2", ""):
-            fan["M106 P2"] = fan_state.get("M106 P2")
-
-        if filament_used and filament_used != old_filament_used:
-            pass
-        else:
-            filament_used = old_filament_used
-        if last_print_duration and last_print_duration != old_last_print_duration:
-            pass
-        else:
-            last_print_duration = old_last_print_duration
-        if pressure_advance and pressure_advance != old_pressure_advance:
-            pass
-        else:
-            pressure_advance = old_pressure_advance
-        data = {
-            'file_path': file_name,
-            'absolute_coord': self.absolute_coord,
-            'absolute_extrude': self.absolute_extrude,
-            # 'fan_state': state,
-            'fan_state': fan,
-            'M204': M204_accel,
-            'filament_used': filament_used,
-            'last_print_duration': last_print_duration,
-            'SET_GCODE_OFFSET': set_gcode_offset,
-            'pressure_advance': pressure_advance
-        }
-        with open(path, "w") as f:
-            f.write(json.dumps(data))
-            f.flush()
     cmd_SAVE_GCODE_STATE_help = "Save G-Code coordinate state"
     def cmd_SAVE_GCODE_STATE(self, gcmd):
         state_name = gcmd.get('NAME', 'default')

@@ -284,24 +284,7 @@ class PrinterProbe:
         configfile.set(self.name, 'z_offset', "%.3f" % (new_calibrate,))
         self.z_offset_calibrate = new_calibrate
         self.z_offset_change_flag = True
-        self.record_gcode_offset_when_printing()
     cmd_Z_OFFSET_APPLY_PROBE_help = "Adjust the probe's z_offset"
-
-    def record_gcode_offset_when_printing(self):
-        import os, json
-        try:
-            configfile = self.printer.lookup_object('configfile')
-            print_stats = self.printer.load_object(configfile, 'print_stats')
-            v_sd = self.printer.lookup_object('virtual_sdcard')
-            if print_stats and print_stats.state == "printing" and os.path.exists(v_sd.print_file_name_path) and self.z_offset_change_flag:
-                with open(v_sd.print_file_name_path, "r") as f:
-                    result = (json.loads(f.read()))
-                    result["SET_GCODE_OFFSET"] = self.z_offset_calibrate
-                with open(v_sd.print_file_name_path, "w") as f:
-                    f.write(json.dumps(result))
-                    f.flush()
-        except Exception as err:
-            logging.error("record_gcode_offset_when_printing error: %s" % err)
 
 # Endstop wrapper that enables probe specific features
 class ProbeEndstopWrapper:

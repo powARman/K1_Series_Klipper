@@ -40,8 +40,6 @@ class VirtualSD:
         self.gcode.register_command(
             "SDCARD_PRINT_FILE", self.cmd_SDCARD_PRINT_FILE,
             desc=self.cmd_SDCARD_PRINT_FILE_help)
-        self.print_file_name_path = "/usr/data/creality/userdata/config/print_file_name.json"
-        self.count_M204 = 0
         self.run_dis = 0.0
     def handle_shutdown(self):
         if self.work_timer is not None:
@@ -57,7 +55,6 @@ class VirtualSD:
             logging.info("Virtual sdcard (%d): %s\nUpcoming (%d): %s",
                          readpos, repr(data[:readcount]),
                          self.file_position, repr(data[readcount:]))
-        self.count_M204 = 0
     def stats(self, eventtime):
         if self.work_timer is None:
             return False, ""
@@ -119,19 +116,12 @@ class VirtualSD:
         self.work_timer = self.reactor.register_timer(
             self.work_handler, self.reactor.NOW)
     def do_cancel(self):
-        self.count_M204 = 0
         if self.current_file is not None:
             self.do_pause()
             self.current_file.close()
             self.current_file = None
             self.print_stats.note_cancel()
         self.file_position = self.file_size = 0.
-        from subprocess import call
-        if os.path.exists(self.print_file_name_path):
-            os.remove(self.print_file_name_path)
-        if os.path.exists(self.gcode.exclude_object_info):
-            os.remove(self.gcode.exclude_object_info)
-        call("sync", shell=True)
     # G-Code commands
     def cmd_error(self, gcmd):
         raise gcmd.error("SD write not supported")
@@ -229,15 +219,6 @@ class VirtualSD:
         return self.cmd_from_sd
     # Background work timer
     def work_handler(self, eventtime):
-        filename = os.path.basename(self.current_file.name) if self.current_file else ""
-        logging.info("work_handler start print, filename:%s" % self.current_file.name)
-        # self.print_stats.note_start()
-        import time
-        from subprocess import check_output
-        try:
-            self.gcode.run_script("G90")
-        except Exception as err:
-            logging.exception("work_handler RESTORE_GCODE_STATE error: %s" % err)
         logging.info("Starting SD card print (position %d)", self.file_position)
         self.reactor.unregister_timer(self.work_timer)
         try:
@@ -270,12 +251,6 @@ class VirtualSD:
                     self.current_file = None
                     logging.info("Finished SD card print")
                     self.gcode.respond_raw("Done printing file")
-                    if os.path.exists(self.print_file_name_path):
-                        os.remove(self.print_file_name_path)
-                    if os.path.exists(self.gcode.exclude_object_info):
-                        os.remove(self.gcode.exclude_object_info)
-                    self.count_M204 = 0
-                    time.sleep(0.3)
                     break
                 lines = data.split('\n')
                 lines[0] = partial_input + lines[0]
@@ -293,11 +268,6 @@ class VirtualSD:
             next_file_position = self.file_position + len(line) + 1
             self.next_file_position = next_file_position
             try:
-                if line.startswith("END_PRINT"):
-                    if os.path.exists(self.print_file_name_path):
-                        os.remove(self.print_file_name_path)
-                    if os.path.exists(self.gcode.exclude_object_info):
-                        os.remove(self.gcode.exclude_object_info)
                 self.gcode.run_script(line)
             except self.gcode.error as e:
                 error_message = str(e)

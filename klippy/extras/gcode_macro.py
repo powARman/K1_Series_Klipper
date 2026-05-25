@@ -174,21 +174,6 @@ class GCodeMacro:
         v = dict(self.variables)
         v[variable] = literal
         self.variables = v
-        try:
-            import os, json
-            if "z_safe_pause" in variable:
-                logging.info("SET_GCODE_VARIABLE variable:%s literal:%s" % (variable, literal))
-                v_sd = self.printer.lookup_object('virtual_sdcard', None)
-                if os.path.exists(v_sd.print_file_name_path):
-                    result = {}
-                    with open(v_sd.print_file_name_path, "r") as f:
-                        result = (json.loads(f.read()))
-                        result["variable_z_safe_pause"] = literal
-                    with open(v_sd.print_file_name_path, "w") as f:
-                        f.write(json.dumps(result))
-                        f.flush()
-        except Exception as err:
-            logging.error("SET_GCODE_VARIABLE save z_safe_pause err:%s" % err)
     def cmd(self, gcmd):
         if self.in_script:
             raise gcmd.error("Macro %s called recursively" % (self.alias,))
