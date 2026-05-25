@@ -4,7 +4,6 @@
 #
 # This file may be distributed under the terms of the GNU GPLv3 license.
 import os, re, logging, collections, shlex
-from extras.tool import reportInformation
 
 class CommandError(Exception):
     pass
@@ -300,19 +299,12 @@ class GCodeDispatch:
         lines = [l.strip() for l in msg.strip().split('\n')]
         self.respond_raw("// " + "\n// ".join(lines))
     def _respond_error(self, msg):
-        from extras.tool import reportInformation
         try:
             v_sd = self.printer.lookup_object('virtual_sdcard')
             if v_sd.print_id and "key" in msg and re.findall('key(\d+)', msg) and v_sd.cur_print_data:
                 v_sd.update_print_history_info(only_update_status=True, state="error", error_msg=eval(msg))
                 v_sd.print_id = ""
-                reportInformation("key701", data=v_sd.cur_print_data)
                 v_sd.cur_print_data = {}
-        except Exception as err:
-            logging.error(err)
-        try:
-            if "key" in msg and re.findall('key(\d+)', msg):
-                reportInformation(msg)
         except Exception as err:
             logging.error(err)
         logging.warning(msg)

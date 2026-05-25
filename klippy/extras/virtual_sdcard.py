@@ -4,7 +4,6 @@
 #
 # This file may be distributed under the terms of the GNU GPLv3 license.
 import os, logging, io, json, time
-from .tool import reportInformation
 
 VALID_GCODE_EXTS = ['gcode', 'g', 'gco']
 LAYER_KEYS = ["; layer #", ";LAYER:", "; layer:", "; LAYER:", ";AFTER_LAYER_CHANGE", ";LAYER_CHANGE", "; CHANGE_LAYER"]
@@ -182,7 +181,6 @@ class VirtualSD:
             pass
         self.update_print_history_info(only_update_status=True, state="cancelled")
         if self.print_id and self.cur_print_data:
-            reportInformation("key701", data=self.cur_print_data)
             self.print_id = ""
             self.cur_print_data = {}
     # G-Code commands
@@ -277,7 +275,6 @@ class VirtualSD:
                             if only_update_status and self.print_id and (state == "error" or state == "completed") and os.path.exists("/tmp/camera_main"):
                                 update_obj["jpg_filename"] = "%s.jpg" % self.print_id
                                 time.sleep(0.5)
-                                reportInformation("key608", data={"print_id": self.print_id})
 
                 if index != -1:
                     print_list[index] = update_obj
@@ -708,7 +705,6 @@ class VirtualSD:
                     self.fan_state = {}
                     self.update_print_history_info(only_update_status=True, state="completed")
                     time.sleep(0.3)
-                    reportInformation("key701", data=self.cur_print_data)
                     self.cur_print_data = {}
                     self.print_id = ""
                     break
