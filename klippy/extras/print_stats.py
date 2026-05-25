@@ -16,7 +16,6 @@ class PrintStats:
             "SET_PRINT_STATS_INFO", self.cmd_SET_PRINT_STATS_INFO,
             desc=self.cmd_SET_PRINT_STATS_INFO_help)
         # G28 down 12mm flag
-        self.power_loss = 0
         self.print_duration = 0
         self.z_pos_filepath = "/usr/data/creality/userdata/config/z_pos.json"
         self.z_pos = self.get_z_pos()
@@ -147,7 +146,6 @@ class PrintStats:
             'message': self.error_message,
             'info': {'total_layer': self.info_total_layer,
                      'current_layer': self.info_current_layer},
-            'power_loss': self.power_loss,
             'z_pos': self.z_pos,
         }
 

@@ -124,20 +124,6 @@ class CUSTOM_MACRO:
     def cmd_SET_QMODE_FLAG(self, gcmd):
         self.qmode_flag =  gcmd.get_int('FLAG', default=1, minval=0, maxval=1)
         gcmd.respond_info("[cmd_SET_QMODE_FLAG] self.qmode_flag={}".format(self.qmode_flag))
-        import json, logging
-        try:
-            print_stats = self.printer.lookup_object('print_stats')
-            v_sd = self.printer.lookup_object('virtual_sdcard')
-            speed_mode_path = v_sd.speed_mode_path
-            if print_stats.state == "printing" and self.qmode_flag == 1:
-                result = {}
-                result["speed_mode"] = 2
-                with open(speed_mode_path, "w") as f:
-                    f.write(json.dumps(result))
-                    f.flush()
-        except Exception as err:
-            err_msg = "cmd_SET_QMODE_FLAG err %s" % str(err)
-            logging.error(err_msg)
         pass
 
 def load_config(config):

@@ -26,10 +26,6 @@ class PauseResume:
         self.gcode.register_command("CANCEL_PRINT", self.cmd_CANCEL_PRINT,
                                     desc=self.cmd_CANCEL_PRINT_help)
         webhooks = self.printer.lookup_object('webhooks')
-        webhooks.register_endpoint("pause_resume/cancel_continue_print",
-                                   self._handle_cancel_continue_print_request)
-        webhooks.register_endpoint("pause_resume/check_continue_print_state",
-                                   self._check_power_loss_state_request)
         webhooks.register_endpoint("pause_resume/set_print_first_layer",
                                    self._set_print_first_layer_request)
         webhooks.register_endpoint("pause_resume/cancel",
@@ -62,62 +58,6 @@ class PauseResume:
         response = {"state": "success"}
         web_request.send(response)
         return response
-    def _check_power_loss_state_request(self, web_request): 
-        from subprocess import call
-        response = {"file_state": False, "eeprom_state": False}
-        if os.path.exists(self.v_sd.print_file_name_path):
-            try:
-                with open(self.v_sd.print_file_name_path, "r") as f:
-                    data = f.read()
-                    if len(data) == 0:
-                        logging.error("%s f.read()==None read fail!!!" % self.v_sd.print_file_name_path)
-                    response["file_state"] = True if json.loads(data) else False
-            except Exception as err:
-                os.remove(self.v_sd.print_file_name_path)
-                bl24c16f = self.printer.lookup_object('bl24c16f') if "bl24c16f" in self.printer.objects else None
-                if bl24c16f:
-                    self.gcode.run_script("EEPROM_WRITE_BYTE ADDR=1 VAL=255")
-                logging.exception(err)
-        power_loss_switch = False
-        if os.path.exists(self.v_sd.user_print_refer_path):
-            with open(self.v_sd.user_print_refer_path, "r") as f:
-                data = json.loads(f.read())
-                power_loss_switch = data.get("power_loss", {}).get("switch", False)
-        bl24c16f = self.printer.lookup_object('bl24c16f') if "bl24c16f" in self.printer.objects else None
-        eepromState = bl24c16f.checkEepromFirstEnable() if power_loss_switch and bl24c16f else True
-        if not eepromState:
-            response["eeprom_state"] = True
-        print_stats = self.printer.lookup_object('print_stats', None)
-        if response["file_state"] == True and response["eeprom_state"] == True and print_stats and print_stats.state == "standby":
-            print_stats.power_loss = 1
-        if print_stats and print_stats.state != "standby":
-            response["file_state"] = False
-            response["eeprom_state"] = False
-            logging.info("current printer state:%s" % print_stats.state)
-        if os.path.exists(self.gcode.exclude_object_info) and (response["file_state"]==False or response["eeprom_state"]==False):
-            os.remove(self.gcode.exclude_object_info)
-        web_request.send(response)
-        return response
-    def _handle_cancel_continue_print_request(self, web_request):
-        from subprocess import call
-        if os.path.exists(self.v_sd.print_file_name_path):
-            os.remove(self.v_sd.print_file_name_path)
-        if os.path.exists(self.gcode.exclude_object_info):
-            os.remove(self.gcode.exclude_object_info)
-        call("sync", shell=True)
-        bl24c16f = self.printer.lookup_object('bl24c16f') if "bl24c16f" in self.printer.objects else None
-        power_loss_switch = False
-        if os.path.exists(self.v_sd.user_print_refer_path):
-            with open(self.v_sd.user_print_refer_path, "r") as f:
-                data = json.loads(f.read())
-                power_loss_switch = data.get("power_loss", {}).get("switch", False)
-        bl24c16f = self.printer.lookup_object('bl24c16f') if "bl24c16f" in self.printer.objects else None
-        if power_loss_switch and bl24c16f:
-            self.gcode.run_script("EEPROM_WRITE_BYTE ADDR=1 VAL=255")
-            self.gcode.respond_info("cancel_continue_print:success")
-        print_stats = self.printer.lookup_object('print_stats', None)
-        if print_stats:
-            print_stats.power_loss = 0
     def _handle_cancel_request(self, web_request):
         self.gcode.run_script("CANCEL_PRINT")
     def _handle_pause_request(self, web_request):
@@ -154,7 +94,6 @@ class PauseResume:
     def send_resume_command(self):
         if self.sd_paused:
             # Printing from virtual sd, run pause command
-            self.v_sd.do_resume_status = True
             self.v_sd.do_resume()
             self.sd_paused = False
         else:
