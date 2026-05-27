@@ -226,9 +226,6 @@ class ExcludeObject:
         reset = gcmd.get('RESET', None)
         current = gcmd.get('CURRENT', None)
         name = gcmd.get('NAME', '').upper()
-        if name == self.current_object:
-            self.gcode.respond_info("Forbidden EXCLUDE_OBJECT current_print_object:%s" % self.current_object)
-            return
 
         if reset:
             if name:

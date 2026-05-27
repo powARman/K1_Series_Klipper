@@ -7,7 +7,7 @@
 PIN_MIN_TIME = 0.100
 RESEND_HOST_TIME = 0.300 + PIN_MIN_TIME
 MAX_SCHEDULE_TIME = 5.0
-import logging
+
 class PrinterOutputPin:
     def __init__(self, config):
         self.printer = config.get_printer()
@@ -67,23 +67,16 @@ class PrinterOutputPin:
 
         toolhead = self.printer.lookup_object('toolhead')
         toolhead.register_lookahead_callback(
-            lambda print_time: self._set_pin(print_time, value, cycle_time))
-
-
-        # toolhead = self.printer.lookup_object('toolhead')
-        # toolhead.register_lookahead_callback(
-        #     lambda print_time: self._set_pin(print_time, value, 0))
+           lambda print_time: self._set_pin(print_time, value, cycle_time))
     def checkpwm(self, eventtime):
         systime = self.reactor.monotonic()
         for heater in self.heaters.heaters.values():
-
             eventtime = self.reactor.monotonic()
             if heater.name == "heater_bed" :
                 if heater.check_busy(eventtime) :
                     if self.ispweron == False and heater.target_temp != 0:
                         self.set_poewon(0)
                         self.ispweron = True
-
                 else:
                     if self.ispweron == True:
                         self.ispweron = False

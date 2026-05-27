@@ -274,10 +274,7 @@ class PrinterHoming:
         homing_state.set_axes([2])
         kin = self.printer.lookup_object('toolhead').get_kinematics()
         homing_state.set_axes([2])
-        # gcode = self.printer.lookup_object('gcode')
-        # gcode.respond_info("cmd_STEPPER_Z_SENEORLESS")
         kin.home_z_with_sensorless(homing_state, move_dist)
-        # gcode = self.printer.lookup_object('gcode')
         pos = toolhead.get_position()
         pos[2] = move_dist - 3
         toolhead.set_position(pos, homing_axes=[2])

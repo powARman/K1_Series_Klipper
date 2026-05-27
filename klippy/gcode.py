@@ -243,17 +243,8 @@ class GCodeDispatch:
         r'(?P<cmd>[a-zA-Z_][a-zA-Z0-9_]+)(?:\s+|$)'
         r'(?P<args>[^#*;]*?)'
         r'\s*(?:[#*;].*)?$')
-    extended_r1 = re.compile(
-        r'^\s*(?:N[0-9]+\s*)?'
-        r'(?P<cmd>[a-zA-Z_][a-zA-Z0-9_]+)(?:\s+|$)'
-        r'(?P<args>[^\|*]*?)'
-        r'\s*(?:[\|*].*)?$')
     def _get_extended_params(self, gcmd):
-        if gcmd.get_commandline().startswith("SDCARD_PRINT_FILE"):
-            # Support filename contain '#'
-            m = self.extended_r1.match(gcmd.get_commandline())
-        else:
-            m = self.extended_r.match(gcmd.get_commandline())
+        m = self.extended_r.match(gcmd.get_commandline())
         if m is None:
             raise self.error("Malformed command '%s'"
                              % (gcmd.get_commandline(),))

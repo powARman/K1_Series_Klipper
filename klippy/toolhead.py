@@ -198,7 +198,6 @@ class DripModeEndSignal(Exception):
 # Main code to track events (and their timing) on the printer toolhead
 class ToolHead:
     def __init__(self, config):
-        self.config = config
         self.printer = config.get_printer()
         self.reactor = self.printer.get_reactor()
         self.all_mcus = [
@@ -587,14 +586,8 @@ class ToolHead:
             requested_accel_to_decel is None):
             gcmd.respond_info(msg, log=False)
     def cmd_M204(self, gcmd):
-        accel_S = int(float(gcmd.get('S', -1)))
-        if accel_S != -1 and accel_S <= 100:
-            accel = 100
-        else:
-            accel = gcmd.get_float('S', None, above=0.)
         # Use S for accel
-        # accel = gcmd.get_float('S', None, above=0.)
-        cmd = "M204 S%s" % accel
+        accel = gcmd.get_float('S', None, above=0.)
         if accel is None:
             # Use minimum of P and T for accel
             p = gcmd.get_float('P', None, above=0.)
@@ -604,7 +597,6 @@ class ToolHead:
                                   % (gcmd.get_commandline(),))
                 return
             accel = min(p, t)
-            cmd = "M204 P%s T%s" % (p, t)
         self.max_accel = accel
         self._calc_junction_deviation()
 

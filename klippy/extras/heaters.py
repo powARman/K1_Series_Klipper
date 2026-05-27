@@ -171,8 +171,6 @@ class ControlBangBang:
                 if self.old_temp <= 0.01 or self.old_temp < temp:
                     self.old_temp = temp
                     self.cnt_temp = 0
-                    # self.diff_tempa = 16.1 + (119-16.1)/100.*(target_temp-20.0)
-                    # self.diff_tempb = 16.3 + (119.5-16.3)/100.*(target_temp-20.0)
                     self.diff_tempa = 16.1 + 1.029 * (target_temp-20.0)
                     self.diff_tempb = 16.3 + 1.032 * (target_temp-20.0)
                 elif self.old_temp > temp:
@@ -180,8 +178,6 @@ class ControlBangBang:
                     if self.cnt_temp > 10:
                         self.long_temp =False
             else:
-                # self.diff_tempa = 19.1 + (119.7-19.1)/100.*(target_temp-20.0)
-                # self.diff_tempb = 19.3 + (120.2-19.3)/100.*(target_temp-20.0)
                 self.diff_tempa = 19.1 + 1.006 * (target_temp-20.0)
                 self.diff_tempb = 19.3 + 1.009 * (target_temp-20.0)
             if self.heating and temp >= self.diff_tempb:
@@ -412,15 +408,10 @@ class PrinterHeaters:
             self.bed_temperature_wait = True
         else:
             self.extruder_temperature_wait = True
-        while not self.printer.is_shutdown() and heater.check_busy(eventtime) :
+        while not self.printer.is_shutdown() and heater.check_busy(eventtime):
             if self.can_break:
                 self.can_break_flag = 2
                 self.can_break = False
-                # toolhead._handle_shutdown()
-                #toolhead.move_queue.reset()
-                # self.turn_off_all_heaters()
-                #gcode.run_script("G28")
-
                 break
             print_time = toolhead.get_last_move_time()
             gcode.respond_raw(self._get_temp(eventtime))
