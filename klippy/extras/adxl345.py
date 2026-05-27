@@ -5,8 +5,6 @@
 # This file may be distributed under the terms of the GNU GPLv3 license.
 import logging, time, collections, threading, multiprocessing, os
 from . import bus, motion_report
-import struct
-from multiprocessing import shared_memory
 
 # ADXL345 registers
 REG_DEVID = 0x00
@@ -85,71 +83,6 @@ class AccelQueryHelper:
                 count += 1
         del samples[count:]
         return self.samples
-
-    def copy_double_to_buffer(self, buffer, offset, val):
-        bytes = struct.pack("d", val)
-
-        # little store
-        try:
-            buffer[offset:offset+8] = bytearray(bytes)
-            del bytes
-        except:
-            gcode = self.printer.lookup_object('gcode')
-            gcode.respond_info("val: %f, bytes: %s, offset: %d" % (val, bytes.hex(), offset))
-
-    def copy_int_to_buffer(self, buffer, offset, val):
-        # little store
-        try:
-            buffer[offset] = val & 0xFF
-            buffer[offset + 1] = (val >> 8) & 0xFF
-            buffer[offset + 2] = (val >> 16) & 0xFF
-            buffer[offset + 3] = (val >> 24) & 0xFF
-        except:
-            gcode = self.printer.lookup_object('gcode')
-            gcode.respond_info("val: %f, offset: %d" % (val, offset))
-
-    def get_samples_to_shared_mem(self):
-        gcode = self.printer.lookup_object('gcode')
-        raw_samples = self._get_raw_samples()
-        if not raw_samples:
-            return self.samples
-        total = sum([len(m['params']['data']) for m in raw_samples])
-        count = 0
-
-        # shm size = (double bytes) * (count of member: samp_time, x, y and z) * total
-        shm_size = 8 * 4 * total
-        shm = shared_memory.SharedMemory(name="psm_samples", create=True, size=shm_size)
-
-        buffer = shm.buf
-        self.copy_int_to_buffer(buffer, 0, count)
-        count += 4
-
-        reactor = self.printer.get_reactor()
-        for msg in raw_samples:
-            for samp_time, x, y, z in msg['params']['data']:
-                if samp_time < self.request_start_time:
-                    continue
-                if samp_time > self.request_end_time:
-                    break
-
-                # 30000 * sizeof(samp_time, x, y, z) + sizeof(count)
-                # switch process
-                if count % 960000 == 4:
-                    reactor.pause(reactor.monotonic() + .1)
-
-                self.copy_double_to_buffer(buffer, count, samp_time)
-                count += 8
-                self.copy_double_to_buffer(buffer, count, x)
-                count += 8
-                self.copy_double_to_buffer(buffer, count, y)
-                count += 8
-                self.copy_double_to_buffer(buffer, count, z)
-                count += 8
-
-        self.copy_int_to_buffer(buffer, 0, count)
-        shm.close()
-        gcode.respond_info("shm_size: %d, double bytes count: %d" % (shm_size, count))
-
     def write_to_file(self, filename):
         def write_impl():
             try:

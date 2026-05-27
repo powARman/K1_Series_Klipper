@@ -60,8 +60,6 @@ class VibrationPulseTest:
 
         self.probe_points = config.getlists('probe_points', seps=(',', '\n'),
                                             parser=float, count=3)
-        self.low_mem = config.getboolean('low_mem', True)
-
     def get_start_test_points(self):
         return self.probe_points
     def prepare_test(self, gcmd):
@@ -204,10 +202,7 @@ class ResonanceTester:
                         raise gcmd.error(
                             "accelerometer '%s' measured no data" % (
                                 chip_name,))
-                    if self.test.low_mem:
-                        new_data = helper.lowmem_process_accelerometer_data(aclient)
-                    else:
-                        new_data = helper.process_accelerometer_data(aclient)
+                    new_data = helper.process_accelerometer_data(aclient)
                     if calibration_data[axis] is None:
                         calibration_data[axis] = new_data
                     else:
