@@ -288,12 +288,10 @@ class PRTouchEndstopWrapper:
 
     #region Handles
     def _handle_step_debug_prtouch(self, params):
-        # self.print_msg('HD_STEP_DEBUG', str(params))
         self.ver_step = 'V' + str(params['version'] / 100)
         pass
 
     def _handle_result_run_step_prtouch(self, params):
-        # self.print_msg('HD_RUN_STEP', str(params))
         self.step_tri_time = params['tri_time'] / 10000.
         for i in range(4):
             sdir = {'tick': params['tick%d' % i] / 10000., 'step': params['step%d' % i], 'index': params['index']}
@@ -311,12 +309,10 @@ class PRTouchEndstopWrapper:
         pass
 
     def _handle_pres_debug_prtouch(self, params):
-        # self.print_msg('HD_PRES_DEBUG', str(params))
         self.ver_pres = 'V' + str(params['version'] / 100)
         pass
 
     def _handle_result_run_pres_prtouch(self, params):
-        # self.print_msg('HD_RUN_PRES', str(params))
         self.pres_tri_time = params['tri_time'] / 10000.
         self.pres_tri_chs = params['tri_chs']
         self.pres_buf_cnt = params['buf_cnt']
@@ -326,7 +322,6 @@ class PRTouchEndstopWrapper:
         pass
 
     def _handle_result_read_pres_prtouch(self, params):
-        # self.print_msg('HD_READ_PRES', str(params), True)
         self.pres_res.append(params)
         pass
     #endregion
@@ -423,8 +418,6 @@ class PRTouchEndstopWrapper:
         self.print_msg('RAISE_ERROR', "Start Raise Error")
         # 出错默认抬升热床原理碰头一段距离（默认：25mm）
         self.enable_steps()
-        # now_pos = self.toolhead.get_position()
-        # self.print_msg('RAISE_ERROR', "Start Raise Error Z Pos:{}".format(now_pos))
         down_min_z = 5
         step_cnt, step_us, acc_ctl_cnt = self.get_step_cnts(down_min_z, 10) #self.tri_z_down_spd[0]
         self.step_res = []
@@ -433,7 +426,6 @@ class PRTouchEndstopWrapper:
         while (time.time() - t_last < (down_min_z/10 + 10) and (len(self.step_res) != MAX_BUF_LEN)):
             self.delay_s(0.010)
         self.start_step_prtouch_cmd.send([self.step_oid, 0, 0, 0, 0, 0, self.low_spd_nul, self.send_step_duty, 0])
-        # self.toolhead.set_position(now_pos[:2] + [0, now_pos[3]], homing_axes=[2])
         self.disable_steps()
 
         err_code['values'] = vals
@@ -557,7 +549,6 @@ class PRTouchEndstopWrapper:
 
     def set_bed_temps(self, temp, wait=False, err=5):
         self.print_msg('SET_BED_TEMPS', 'temp=%.2f, wait=%d, err=%f'% (temp, wait, err))
-        # self.pheaters.set_temperature(self.heater_bed, temp, False)
         self.gcode.run_script_from_command('M140 S%d' % (temp))
         if wait:
             while not self.shut_down and abs(self.heater_bed.target_temp - self.heater_bed.smoothed_temp) > err and self.heater_bed.target_temp > 0:
@@ -590,12 +581,9 @@ class PRTouchEndstopWrapper:
         self.print_msg('SHAKE_MOTOR', 'shake_cnt={} shake_z_velocity={} shake_z_accel:{} shake_range:{} max_z_v:{} max_z_accel:{}'.format(cnt,self.shake_z_velocity,self.shake_z_accel,self.shake_range,temp_max_z_velocity,temp_max_z_accel))
         for i in range(cnt):
             if i % 2 == 0:
-                # self.gcode.run_script_from_command('G1')
                 self.gcode.run_script_from_command('G1 Z%.2f F%d' % (now_pos[2], int(60 * self.shake_z_velocity)))
             else:
                 self.gcode.run_script_from_command('G1 Z%.2f F%d' % (now_pos[2] + self.shake_range, int(60 * self.shake_z_velocity)))
-            # while len(self.toolhead.move_queue.queue) >= 5:
-            #     self.delay_s(0.010)
 
         self.toolhead.kin.max_z_velocity = temp_max_z_velocity
         self.toolhead.kin.max_z_accel =    temp_max_z_accel
@@ -822,7 +810,6 @@ class PRTouchEndstopWrapper:
                 self.print_msg('DEBUG', '--Self Test 1 = PR_ERR_CODE_SWAP_PIN_DETECTI, Error!! params0:{} params1:{}--'.format(params0,params1), force)
                 static_check_error_state = 1
                 continue
-                # self.ck_and_raise_error(True, PR_ERR_CODE_SWAP_PIN_DETECTI)
             else:
                 self.print_msg('DEBUG', '--Self Test 1 = PR_ERR_CODE_SWAP_PIN_DETECTI, Pass!!--', force)
 
@@ -1057,7 +1044,7 @@ class PRTouchEndstopWrapper:
                 for j in range(self.pres_cnt):
                     for i in range(len(self.pres_res)):
                         pnt_vals[j].append(self.pres_res[i]['ch%d' % j])
-                    # self.print_msg('DEBUG'," pnt_vals[{}][-1]:{} normal:[{}]".format(j,pnt_vals[j],self.check_std_mim))
+
                 # 高通滤波
                 rc = 1. / 2. / math.pi / self.cal_hftr_cut
                 coff = rc / (rc + 1. / (1000 / self.tri_acq_ms))
@@ -1225,9 +1212,6 @@ class PRTouchEndstopWrapper:
                     return 999,False
             else:
                 ck_pres_error_cnt = 0
-
-            # self.ck_and_manual_get_step()
-            # self.ck_and_manual_get_pres()
 
             # 擦嘴时探测高度小于最小z范围
             if self.nozzle_clear_z_out_of_range == True:
@@ -1682,7 +1666,6 @@ class PRTouchEndstopWrapper:
         self.toolhead.set_position(now_pos[:2] + [0, now_pos[3]], homing_axes=[2])
         min_x, min_y = self.bed_mesh.bmc.mesh_min
         max_x, max_y = self.bed_mesh.bmc.mesh_max
-        # now_pos = [min_x + (max_x - min_x) / 2, min_y + (max_y - min_y) / 2, now_pos[2], now_pos[3]]
         now_pos = [self.home_x, self.home_y, now_pos[2], now_pos[3]]
         # 1. Check hot temp
         target_temp = self.heater_hot.target_temp
@@ -1855,15 +1838,6 @@ class PRTouchEndstopWrapper:
         res1.append(last_point)
 
         now_pos = self.toolhead.get_position()
-        # self.best_above_z *= 2
-        # self.rdy_z_spd *= 0.75
-        # self.tri_z_down_spd *= 0.75
-        # self.tri_z_up_spd *= 0.75
-        # self.low_spd_nul *= 2
-        # self.run_max_velocity = int(self.run_max_velocity / 2)
-        # self.run_max_accel = int(self.run_max_accel / 2)
-        # self.run_max_z_velocity = int(self.run_max_z_velocity / 2)
-        # self.run_max_z_accel = int(self.run_max_z_accel / 2)
 
         self.move(now_pos[:2] + [5, now_pos[3]], self.rdy_z_spd)
 
@@ -1909,16 +1883,6 @@ class PRTouchEndstopWrapper:
                     self.print_msg('WHY ERROR',"FUN:run_re_g29s run_step_prtouch() ERROR")
                     return False
             self.run_G28_Z(True)
-
-        # self.best_above_z = int(self.best_above_z / 2)
-        # self.rdy_z_spd /= 0.75
-        # self.tri_z_down_spd /= 0.75
-        # self.tri_z_up_spd /= 0.75
-        # self.low_spd_nul = int(self.low_spd_nul / 2)
-        # self.run_max_velocity = int(self.run_max_velocity * 2)
-        # self.run_max_accel = int(self.run_max_accel * 2)
-        # self.run_max_z_velocity = int(self.run_max_z_velocity * 2)
-        # self.run_max_z_accel = int(self.run_max_z_accel * 2)
 
         last_z = res1[-1][2]
         del res1[-1]

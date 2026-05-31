@@ -1657,8 +1657,6 @@ class PRTouchEndstopWrapper:
             if len(self.pres_res) == 0 or len(self.step_res) == 0:
                 if move_down_cnt < 2:
                     move_down_cnt += 1
-                    # self.gcode.run_script_from_command('FORCE_MOVE STEPPER=stepper_z DISTANCE=2 VELOCITY=5')
-                    # self.delay_s(2.0)
                     self.toolhead.set_position(now_pos0[:2] + [0, now_pos0[3]], homing_axes=[2])
                     self.move(now_pos0[:2] + [self.best_above_z * 2, now_pos0[3]], self.tri_z_up_spd * (1.2 if self.use_adc else 2.0))
                 else:
