@@ -3,7 +3,7 @@
 # Copyright (C) 2020  Dmitry Butyugin <dmbutyugin@google.com>
 #
 # This file may be distributed under the terms of the GNU GPLv3 license.
-import collections, importlib, logging, math, multiprocessing, traceback, os
+import collections, importlib, logging, math, multiprocessing, traceback
 shaper_defs = importlib.import_module('.shaper_defs', 'extras')
 
 MIN_FREQ = 5.
@@ -75,14 +75,6 @@ class ShaperCalibrate:
         import queuelogger
         parent_conn, child_conn = multiprocessing.Pipe()
         def wrapper():
-            try:
-                gcode = self.printer.lookup_object("gcode")
-                gcode.respond_info("current nice: %d" % os.nice(0), log=False)
-                val = os.nice(10)
-                gcode.respond_info("process id: %d, current nice: %d" % (os.getpid(), val), log=False)
-            except:
-                gcode.respond_info("nice process failed", log=False)
-                pass
             queuelogger.clear_bg_logging()
             try:
                 res = method(*args)

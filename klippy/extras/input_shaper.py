@@ -105,9 +105,6 @@ class InputShaper:
         gcode.register_command("SET_INPUT_SHAPER",
                                self.cmd_SET_INPUT_SHAPER,
                                desc=self.cmd_SET_INPUT_SHAPER_help)
-        gcode.register_command("UPDATE_INPUT_SHAPER",
-                               self.cmd_UPDATE_INPUT_SHAPER,
-                               desc=self.cmd_UPDATE_INPUT_SHAPER_help)
     def get_shapers(self):
         return self.shapers
     def connect(self):
@@ -161,9 +158,6 @@ class InputShaper:
             self._update_input_shaping()
         for shaper in self.shapers:
             shaper.report(gcmd)
-    cmd_UPDATE_INPUT_SHAPER_help = "cmd_UPDATE_INPUT_SHAPER parameters for input shaper"
-    def cmd_UPDATE_INPUT_SHAPER(self, gcmd):
-        self.connect()
 
 def load_config(config):
     return InputShaper(config)
