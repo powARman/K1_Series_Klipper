@@ -51,18 +51,12 @@ class CoreXYKinematics:
         # for axis in homing_state.get_axes():
         rail = self.rails[2]
         # Determine movement
-        # position_min, position_max = rail.get_range()
         position_min = top
         hi = rail.get_homing_info()
         homepos = [None, None, None, None]
         homepos[2] = hi.position_endstop + position_min
         forcepos = list(homepos)
         forcepos[2] -= position_min
-        # forcepos[2] += 1.5 * (position_max - hi.position_endstop)
-        # if hi.positive_dir:
-        #     forcepos[axis] -= 1.5 * (hi.position_endstop - position_min)
-        # else:
-        #     forcepos[axis] += 1.5 * (position_max - hi.position_endstop)
         # Perform homing
         rail.homing_retract_dist = 0
         homing_state.stepper_z_sensorless_flag = True

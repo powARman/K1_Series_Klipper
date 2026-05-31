@@ -178,8 +178,8 @@ class SerialReader:
         logging.info("%sStarting serial connect", self.warn_prefix)
         start_time = self.reactor.monotonic()
         while 1:
-            if self.reactor.monotonic() > start_time + 50.:
-                raise error("Unable to connect %s" % (self.warn_prefix))
+            if self.reactor.monotonic() > start_time + 90.:
+                self._error("Unable to connect")
             try:
                 serial_dev = serial.Serial(baudrate=baud, timeout=0,
                                            exclusive=True)
