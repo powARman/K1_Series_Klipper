@@ -40,7 +40,6 @@ class VirtualSD:
         self.gcode.register_command(
             "SDCARD_PRINT_FILE", self.cmd_SDCARD_PRINT_FILE,
             desc=self.cmd_SDCARD_PRINT_FILE_help)
-        self.run_dis = 0.0
     def handle_shutdown(self):
         if self.work_timer is not None:
             self.must_pause_work = True
@@ -91,7 +90,6 @@ class VirtualSD:
             'is_active': self.is_active(),
             'file_position': self.file_position,
             'file_size': self.file_size,
-            'run_dis': self.run_dis
         }
     def file_path(self):
         if self.current_file:

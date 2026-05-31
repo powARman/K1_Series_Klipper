@@ -208,7 +208,6 @@ class PRTouchEndstopWrapper:
         self.pres_mcu.register_response(self._handle_result_run_pres_prtouch, "result_run_pres_prtouch", self.pres_oid)
         self.pres_mcu.register_response(self._handle_result_read_pres_prtouch, "result_read_pres_prtouch", self.pres_oid)
 
-        self.v_sd = self.printer.lookup_object('virtual_sdcard', None)
         self.run_sta_status = 1
         self.z_set_status = False
         self.nozzle_clear_z_out_of_range = False
@@ -1099,9 +1098,6 @@ class PRTouchEndstopWrapper:
         self.print_msg('RDY_POS', "[00=%.2f, 01=%.2f, 11=%.2f, 10=%.2f]" % (self.rdy_pos[0][2], self.rdy_pos[1][2], self.rdy_pos[2][2], self.rdy_pos[3][2]))
         return True
 
-    def report_run_dis(self, run_dis):
-        self.v_sd.run_dis = run_dis
-
     def safe_move_z(self, run_sta, run_dis, run_spd, run_rdo, tri_call_back = None):
         self.print_msg('SAFE_MOVE_Z', 'run_sta=%d, run_dis=%f, run_spd=%f, run_rdo=%f' % (run_sta, run_dis, run_spd, run_rdo))
         run_dir = 1 if run_dis > 0 else 0
@@ -1110,7 +1106,7 @@ class PRTouchEndstopWrapper:
         if tri_call_back:
             self.safe_move_z_tri_call_back = tri_call_back
         else:
-            self.safe_move_z_tri_call_back = self.report_run_dis
+            self.safe_move_z_tri_call_back = None
 
         self.start_step_prtouch_cmd.send([self.step_oid, run_dir, 0, 0, 0, 0, self.low_spd_nul, self.send_step_duty, 0])
         self.start_pres_prtouch_cmd.send([self.pres_oid, run_dir, 0, 0, 0, 0, 0, 0, 0])
@@ -2028,7 +2024,6 @@ class PRTouchEndstopWrapper:
 
     cmd_SAFE_MOVE_Z_help = "Safe move z"
     def cmd_SAFE_MOVE_Z(self, gcmd):
-        self.v_sd.run_dis = 0.0
         run_sta = gcmd.get_int('STA', 0)
         run_dis = gcmd.get_float('DIS', +10)
         run_spd = gcmd.get_float('SPD', 5.0)
