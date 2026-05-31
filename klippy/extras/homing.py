@@ -232,7 +232,6 @@ class PrinterHoming:
         # Register g-code commands
         gcode = self.printer.lookup_object('gcode')
         gcode.register_command('G28', self.cmd_G28)
-        gcode.register_command('STEPPER_Z_SENEORLESS', self.cmd_STEPPER_Z_SENEORLESS)
         self.probe_type = ""
         if config.has_section('prtouch_v2'):
             self.probe_type = "prtouch_v2"
@@ -266,22 +265,6 @@ class PrinterHoming:
             raise self.printer.command_error(
                 "Probe triggered prior to movement")
         return epos
-        
-    def cmd_STEPPER_Z_SENEORLESS(self, gcmd):
-        toolhead = self.printer.lookup_object('toolhead')
-        move_dist = gcmd.get_int('MOVE_DIST', default=0, minval=0, maxval=30)
-        homing_state = Homing(self.printer)
-        homing_state.set_axes([2])
-        kin = self.printer.lookup_object('toolhead').get_kinematics()
-        homing_state.set_axes([2])
-        kin.home_z_with_sensorless(homing_state, move_dist)
-        pos = toolhead.get_position()
-        pos[2] = move_dist - 3
-        toolhead.set_position(pos, homing_axes=[2])
-        toolhead.manual_move([None, None, 0.], 5)
-        if hasattr(toolhead.get_kinematics(), "note_z_not_homed"):
-            toolhead.get_kinematics().note_z_not_homed()
-
     def cmd_G28(self, gcmd):
         # Move to origin
         axes = []
