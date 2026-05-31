@@ -61,17 +61,6 @@ class ShaperCalibrate:
     def __init__(self, printer):
         self.printer = printer
         self.error = printer.command_error if printer else Exception
-        self.autotune_shapers = ['zv', 'mzv', 'ei', '2hump_ei', '3hump_ei']
-        configfile = self.printer.lookup_object('configfile')
-        gcode_macro_path = '/usr/data/printer_data/config/gcode_macro.cfg'
-        gconfig = None
-        try:
-            gconfig = configfile.read_config(gcode_macro_path)
-            if gconfig and gconfig.has_section('gcode_macro AUTOTUNE_SHAPERS'):
-                AUTOTUNE_SHAPERS = gconfig.getsection('gcode_macro AUTOTUNE_SHAPERS')
-                self.autotune_shapers = list(map(lambda x: x.replace("'", "") , AUTOTUNE_SHAPERS.getlist('variable_autotune_shapers', ['zv', 'mzv', 'ei', '2hump_ei', '3hump_ei'])))
-        except Exception as err:
-            logging.error("gcode_macro_path: %s, configfile.read_config error:%s" % (gcode_macro_path, err))
         try:
             self.numpy = importlib.import_module('numpy')
         except ImportError:
@@ -323,8 +312,7 @@ class ShaperCalibrate:
         best_shaper = None
         all_shapers = []
         for shaper_cfg in shaper_defs.INPUT_SHAPERS:
-            # if shaper_cfg.name not in AUTOTUNE_SHAPERS:
-            if shaper_cfg.name not in self.autotune_shapers:
+            if shaper_cfg.name not in AUTOTUNE_SHAPERS:
                 continue
             shaper = self.background_process_exec(self.fit_shaper, (
                 shaper_cfg, calibration_data, max_smoothing))
