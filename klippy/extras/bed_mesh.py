@@ -144,7 +144,6 @@ class BedMesh:
         self.update_status()
         self.save_profile(self.pmgr.get_current_profile())
         self.load_profile(self.pmgr.get_current_profile())
-        self.gcode.run_script_from_command('CXSAVE_CONFIG')
         probed_matrix = self.z_mesh.get_probed_matrix()
         web_request.send({'probed_matrix': probed_matrix})
     def handle_connect(self):

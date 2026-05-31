@@ -1433,8 +1433,6 @@ class PRTouchEndstopWrapper:
 
         configfile = self.printer.lookup_object('configfile')
         configfile.set('prtouch default', 'version', PR_VERSION)
-
-        self.gcode.run_script_from_command('CXSAVE_CONFIG')
         return True
     
     # TODO 擦嘴程序
