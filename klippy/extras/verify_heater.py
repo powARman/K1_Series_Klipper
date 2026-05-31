@@ -86,13 +86,6 @@ class HeaterCheck:
     def heater_fault(self):
         msg = "Heater %s not heating at expected rate" % (self.heater_name,)
         logging.error(msg)
-        try:
-            gcode = self.printer.lookup_object('gcode')
-            if gcode:
-                gcode.run_script_from_command("M140 S0")
-                gcode.run_script_from_command("M104 S0")
-        except Exception as err:
-            logging.error(err)
         self.printer.invoke_shutdown(msg + HINT_THERMAL)
         return self.printer.get_reactor().NEVER
 

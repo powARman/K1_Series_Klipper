@@ -237,11 +237,6 @@ class VirtualSD:
                 # Read more data
                 try:
                     data = self.current_file.read(8192)
-                except UnicodeDecodeError as err:
-                    logging.exception(err)
-                    err_msg = "File UnicodeDecodeError"
-                    self.gcode.respond_info(err_msg)
-                    raise self.printer.command_error(err_msg)
                 except:
                     logging.exception("virtual_sdcard read")
                     break

@@ -1218,10 +1218,8 @@ class ProfileManager:
     def load_profile(self, prof_name):
         profile = self.profiles.get(prof_name, None)
         if profile is None:
-            # raise self.gcode.error(
-            #     "bed_mesh: Unknown profile [%s]" % prof_name)
-            self.gcode.respond_info("bed_mesh: Unknown profile [%s]" % (prof_name,))
-            return
+            raise self.gcode.error(
+                "bed_mesh: Unknown profile [%s]" % prof_name)
         probed_matrix = profile['points']
         mesh_params = profile['mesh_params']
         z_mesh = ZMesh(mesh_params)
