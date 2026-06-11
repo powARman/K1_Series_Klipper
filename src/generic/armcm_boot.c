@@ -35,7 +35,7 @@ reset_handler_stage_two(void)
     }
 
     // Reset all user interrupt priorities
-#if __CORTEX_M >= 7
+#if __CORTEX_M == 23
     for (i = 0; i < ARRAY_SIZE(NVIC->IPR); i++)
         NVIC->IPR[i] = 0;
 #else
