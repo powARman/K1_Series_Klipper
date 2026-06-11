@@ -86,18 +86,18 @@ void
 sched_add_timer(struct timer *add)
 {
     uint32_t waketime = add->waketime;
-	uint8_t flags = 0;
+    uint8_t flags = 0;
     irqstatus_t flag = irq_save();
     struct timer *tl = SchedStatus.timer_list;
     if (unlikely(timer_is_before(waketime, tl->waketime))) {
         // This timer is before all other scheduled timers
         if (timer_is_before(waketime, timer_read_time()))
-		{
+        {
             //try_shutdown("Timer too close");
-			flags = 1;
-			waketime = timer_read_time() + timer_from_us(2);
-			add->waketime = waketime;
-		}
+            flags = 1;
+            waketime = timer_read_time() + timer_from_us(2);
+            add->waketime = waketime;
+        }
         if (tl == &deleted_timer)
             add->next = deleted_timer.next;
         else
@@ -110,11 +110,10 @@ sched_add_timer(struct timer *add)
         insert_timer(tl, add, waketime);
     }
     irq_restore(flag);
-    if(flags)
-	{			
-		output("Timer too close");
-		flags = 0;
-	}
+    if (flags)
+    {
+        output("Timer too close");
+    }
 }
 
 // The deleted timer is used when deleting an active timer.
@@ -259,9 +258,9 @@ run_tasks(void)
 #if CONFIG_MACH_LINUX
                     irq_wait();
 #else
-					asm volatile("cpsie i" ::: "memory");
-					extern void prtouch_task(void);
-					prtouch_task();
+                    asm volatile("cpsie i" ::: "memory");
+                    extern void prtouch_task(void);
+                    prtouch_task();
 #endif
                 } while (SchedStatus.tasks_status != TS_REQUESTED);
             }
