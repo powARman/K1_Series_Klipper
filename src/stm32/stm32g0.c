@@ -123,12 +123,10 @@ clock_setup(void)
     while ((RCC->CFGR & RCC_CFGR_SWS_Msk) != (2 << RCC_CFGR_SWS_Pos))
         ;
 
-	#ifdef RCC_CCIPR2_USBSEL_Pos
-
+#ifdef USB_BASE
     // Use PLLQCLK for USB (setting USBSEL=2 works in practice)
     RCC->CCIPR2 = 2 << RCC_CCIPR2_USBSEL_Pos;
-
-	#endif
+#endif
 }
 
 
