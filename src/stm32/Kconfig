@@ -52,9 +52,6 @@ choice
     config MACH_STM32F446
         bool "STM32F446"
         select MACH_STM32F4
-    config MACH_STM32F030
-        bool "STM32F030"
-        select MACH_STM32F0
     config MACH_STM32F031
         bool "STM32F031"
         select MACH_STM32F0
@@ -99,7 +96,6 @@ endchoice
 
 config MCU_TYPE
     string
-	default "00" if MACH_STM32F030
 	default "01" if MACH_STM32F031
 	default "02" if MACH_STM32F042
 	default "03" if MACH_STM32F070
@@ -166,7 +162,6 @@ config HAVE_STM32_USBCANBUS
 
 config MCU
     string
-    default "stm32f030x6" if MACH_STM32F030
     default "stm32f031x6" if MACH_STM32F031
     default "stm32f042x6" if MACH_STM32F042
     default "stm32f070xb" if MACH_STM32F070
@@ -203,7 +198,7 @@ config CLOCK_FREQ
 
 config FLASH_SIZE
     hex
-    default 0x4000 if MACH_STM32F031 || MACH_STM32F030
+    default 0x4000 if MACH_STM32F031
     default 0x8000 if MACH_STM32F042
     default 0x20000 if MACH_STM32F070 || MACH_STM32F072
     default 0x10000 if MACH_STM32F103 || MACH_STM32L412 # Flash size of stm32f103x8 (64KiB)
@@ -225,7 +220,7 @@ config RAM_START
 
 config RAM_SIZE
     hex
-    default 0x1000 if MACH_STM32F031 || MACH_STM32F030
+    default 0x1000 if MACH_STM32F031
     default 0x1800 if MACH_STM32F042
     default 0x4000 if MACH_STM32F070 || MACH_STM32F072
     default 0x2800 if MACH_STM32F103x6
