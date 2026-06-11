@@ -119,9 +119,8 @@
 /** @addtogroup Device_Included
   * @{
   */
-#if defined(STM32H723xx)
-  #include "stm32h723xx.h"
-#elif defined(STM32H743xx)
+
+#if defined(STM32H743xx)
   #include "stm32h743xx.h"
 #elif defined(STM32H753xx)
   #include "stm32h753xx.h"

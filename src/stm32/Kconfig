@@ -214,7 +214,6 @@ config FLASH_SIZE
     default 0x20000 if MACH_STM32G0 || MACH_STM32G431
     default 0x20000 if MACH_STM32H750
     default 0x200000 if MACH_STM32H743
-    default 0x100000 if MACH_STM32H723
 
 config FLASH_BOOT_ADDRESS
     hex
@@ -222,7 +221,6 @@ config FLASH_BOOT_ADDRESS
 
 config RAM_START
     hex
-    default 0x24000000 if MACH_STM32H723 || MACH_STM32H743
     default 0x20000000
 
 config RAM_SIZE
@@ -239,8 +237,6 @@ config RAM_SIZE
     default 0x20000 if MACH_STM32F4x5 || MACH_STM32F446
     default 0x24000 if MACH_STM32G0B1
     default 0x9000 if MACH_STM32G071
-    default 0x20000 if MACH_STM32H750 || MACH_STM32H723 || MACH_STM32F207
-    default 0x80000 if MACH_STM32H743
     default 0x24000 if MACH_STM32G0Bx
     default 0x20000 if MACH_STM32H7
 
@@ -384,10 +380,6 @@ choice
         select USBSERIAL
     config STM32_SERIAL_USART1
         bool "Serial (on USART1 PA10/PA9)"
-        select SERIAL
-    config STM32_SERIAL_USART1_ALT_PB14_PB15
-        bool "Serial (on USART1 PB14/PB15)"
-        depends on MACH_STM32H7
         select SERIAL
     config STM32_SERIAL_USART1_ALT_PB7_PB6
         bool "Serial (on USART1 PB7/PB6)" if LOW_LEVEL_OPTIONS
