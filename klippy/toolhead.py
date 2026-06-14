@@ -3,7 +3,7 @@
 # Copyright (C) 2016-2021  Kevin O'Connor <kevin@koconnor.net>
 #
 # This file may be distributed under the terms of the GNU GPLv3 license.
-import math, logging, importlib, os, json
+import math, logging, importlib
 import mcu, chelper, kinematics.extruder
 
 # Common suffixes: _d is distance (in mm), _v is velocity (in
@@ -57,30 +57,7 @@ class Move:
         self.smooth_delta_v2 = min(self.smooth_delta_v2, self.delta_v2)
     def move_error(self, msg="Move out of range"):
         ep = self.end_pos
-        # m = "%s: %.3f %.3f %.3f [%.3f]" % (msg, ep[0], ep[1], ep[2], ep[3])
-        if msg == "Must home axis first":
-            code_key = "key95"
-        elif msg == "Must home first":
-            code_key = "key242"
-        elif msg == "Extrude when no extruder present":
-            code_key = "key114"
-        else:
-            code_key = "key243"
-            min_x = self.toolhead.config.getsection('stepper_x').getfloat('position_min', default=-2)
-            max_x = self.toolhead.config.getsection('stepper_x').getfloat('position_max', default=300)  
-            min_y = self.toolhead.config.getsection('stepper_y').getfloat('position_min', default=-2)      
-            max_y = self.toolhead.config.getsection('stepper_y').getfloat('position_max', default=300)        
-            min_z = self.toolhead.config.getsection('stepper_z').getfloat('position_min', default=-10) 
-            max_z = self.toolhead.config.getsection('stepper_z').getfloat('position_max', default=300)        
-            if min_x > ep[0] or ep[0] > max_x:
-                code_key = "key585"
-            elif min_y > ep[1] or ep[1] > max_y:
-                code_key = "key586"
-            elif min_z > ep[2] or ep[2] > max_z:
-                code_key = "key587"
-            logging.info("stepper xyz min_x:%s max_x:%s|min_y:%s max_y:%s|min_z:%s max_z:%s" % (min_x, max_x, min_y, max_y, min_z, max_z))
-        m = """{"code":"%s","msg":"%s: %.3f %.3f %.3f [%.3f]", "values":[%.3f, %.3f, %.3f, %.3f]}""" % (
-            code_key, msg, ep[0], ep[1], ep[2], ep[3], ep[0], ep[1], ep[2], ep[3])
+        m = "%s: %.3f %.3f %.3f [%.3f]" % (msg, ep[0], ep[1], ep[2], ep[3])
         return self.toolhead.printer.command_error(m)
     def calc_junction(self, prev_move):
         if not self.is_kinematic_move or not prev_move.is_kinematic_move:
@@ -221,8 +198,6 @@ class DripModeEndSignal(Exception):
 # Main code to track events (and their timing) on the printer toolhead
 class ToolHead:
     def __init__(self, config):
-        self.config = config
-        self.qmode_flag = 0
         self.printer = config.get_printer()
         self.reactor = self.printer.get_reactor()
         self.all_mcus = [
@@ -302,17 +277,6 @@ class ToolHead:
                    "manual_probe", "tuning_tower"]
         for module_name in modules:
             self.printer.load_object(config, module_name)
-        self.z_pos_filepath = "/usr/data/creality/userdata/config/z_pos.json"
-        self.z_pos = self.get_z_pos()
-    def get_z_pos(self):
-        z_pos = 0
-        if os.path.exists(self.z_pos_filepath):
-            try:
-                with open(self.z_pos_filepath, "r") as f:
-                    z_pos = float(json.loads(f.read()).get("z_pos", 0))
-            except Exception as err:
-                logging.error(err)
-        return z_pos
     # Print time tracking
     def _update_move_time(self, next_print_time):
         batch_time = MOVE_BATCH_TIME
@@ -446,23 +410,7 @@ class ToolHead:
         self.commanded_pos[:] = newpos
         self.kin.set_position(newpos, homing_axes)
         self.printer.send_event("toolhead:set_position")
-    def record_z_pos(self, commanded_pos_z):
-        curtime = self.printer.get_reactor().monotonic()
-        kin_status = self.kin.get_status(curtime)
-        if ('z' in kin_status['homed_axes']):
-            try:
-                if abs(commanded_pos_z-self.z_pos) > 5:
-                    self.z_pos = commanded_pos_z
-                    with open(self.z_pos_filepath, "w") as f:
-                        f.write(json.dumps({"z_pos": commanded_pos_z}))
-                        f.flush()
-                    print_stats = self.printer.lookup_object('print_stats', None)
-                    print_stats.z_pos = self.z_pos
-                    logging.info("record_z_pos:%s" % commanded_pos_z)
-            except Exception as err:
-                logging.error(err)
     def move(self, newpos, speed):
-        self.record_z_pos(newpos[2])
         move = Move(self, self.commanded_pos, newpos, speed)
         if not move.move_d:
             return
@@ -607,21 +555,6 @@ class ToolHead:
         self.wait_moves()
     cmd_SET_VELOCITY_LIMIT_help = "Set printer velocity limits"
     def cmd_SET_VELOCITY_LIMIT(self, gcmd):
-
-        qmode_max_accel = 0
-        qmode_max_accel_to_decel = 0
-
-        custom_macro = self.printer.lookup_object('custom_macro')
-        self.qmode_flag = custom_macro.qmode_flag
-
-        if self.config.has_section('gcode_macro Qmode'):
-            Qmode = self.config.getsection('gcode_macro Qmode')
-            qmode_max_accel = Qmode.getfloat('variable_max_accel')
-            qmode_max_accel_to_decel = Qmode.getfloat('variable_max_accel_to_decel')
-            # gcmd.respond_info("SET_VELOCITY_LIMIT] qmode_flag={}".format(self.qmode_flag))
-            # gcmd.respond_info("SET_VELOCITY_LIMIT] qmode_max_accel={}".format(qmode_max_accel))
-            # gcmd.respond_info("SET_VELOCITY_LIMIT] qmode_max_accel_to_decel={}".format(qmode_max_accel_to_decel))
-
         max_velocity = gcmd.get_float('VELOCITY', None, above=0.)
         max_accel = gcmd.get_float('ACCEL', None, above=0.)
         square_corner_velocity = gcmd.get_float(
@@ -631,68 +564,41 @@ class ToolHead:
         if max_velocity is not None:
             self.max_velocity = max_velocity
         if max_accel is not None:
-            if self.qmode_flag and max_accel > qmode_max_accel:
-                self.max_accel = qmode_max_accel
-            else:
-                self.max_accel = max_accel
-            # gcmd.respond_info("SET_VELOCITY_LIMIT] self.max_accel={}".format(self.max_accel))
+            self.max_accel = max_accel
         if square_corner_velocity is not None:
             if square_corner_velocity > self.square_corner_max_velocity:
                 square_corner_velocity = self.square_corner_max_velocity
             self.square_corner_velocity = square_corner_velocity
         if requested_accel_to_decel is not None:
-            if self.qmode_flag and requested_accel_to_decel > qmode_max_accel_to_decel:
-                self.requested_accel_to_decel = qmode_max_accel_to_decel
-            else:
-                self.requested_accel_to_decel = requested_accel_to_decel
-            # gcmd.respond_info("SET_VELOCITY_LIMIT] self.requested_accel_to_decel={}".format(self.requested_accel_to_decel))
-
+            self.requested_accel_to_decel = requested_accel_to_decel
         self._calc_junction_deviation()
-        # msg = ("max_velocity: %.6f\n"
-        #        "max_accel: %.6f\n"
-        #        "max_accel_to_decel: %.6f\n"
-        #        "square_corner_velocity: %.6f" % (
-        #            self.max_velocity, self.max_accel,
-        #            self.requested_accel_to_decel,
-        #            self.square_corner_velocity))
-        # self.printer.set_rollover_info("toolhead", "toolhead: %s" % (msg,))
+        msg = ("max_velocity: %.6f\n"
+               "max_accel: %.6f\n"
+               "max_accel_to_decel: %.6f\n"
+               "square_corner_velocity: %.6f" % (
+                   self.max_velocity, self.max_accel,
+                   self.requested_accel_to_decel,
+                   self.square_corner_velocity))
+        self.printer.set_rollover_info("toolhead", "toolhead: %s" % (msg,))
         if (max_velocity is None and
             max_accel is None and
             square_corner_velocity is None and
             requested_accel_to_decel is None):
             gcmd.respond_info(msg, log=False)
     def cmd_M204(self, gcmd):
-        accel_S = int(float(gcmd.get('S', -1)))
-        if accel_S != -1 and accel_S <= 100:
-            accel = 100
-        else:
-            accel = gcmd.get_float('S', None, above=0.)
         # Use S for accel
-        # accel = gcmd.get_float('S', None, above=0.)
-        cmd = "M204 S%s" % accel
+        accel = gcmd.get_float('S', None, above=0.)
         if accel is None:
             # Use minimum of P and T for accel
             p = gcmd.get_float('P', None, above=0.)
             t = gcmd.get_float('T', None, above=0.)
             if p is None or t is None:
-                gcmd.respond_info("""{"code":"key73", "msg": "Invalid M204 command "%s"", "values": ["%s"]}"""
-                                  % (gcmd.get_commandline(),gcmd.get_commandline()))
+                gcmd.respond_info('Invalid M204 command "%s"'
+                                  % (gcmd.get_commandline(),))
                 return
             accel = min(p, t)
-            cmd = "M204 P%s T%s" % (p, t)
         self.max_accel = accel
         self._calc_junction_deviation()
-        v_sd = self.printer.lookup_object('virtual_sdcard', None)
-        print_stats = self.printer.lookup_object('print_stats', None)
-        if print_stats and print_stats.state == "printing" and v_sd and v_sd.count_M204 < 3 and os.path.exists(v_sd.print_file_name_path):
-            v_sd.count_M204 += 1
-            with open(v_sd.print_file_name_path, "r") as f:
-                result = (json.loads(f.read()))
-                result["M204"] = cmd
-            with open(v_sd.print_file_name_path, "w") as f:
-                f.write(json.dumps(result))
-                f.flush()
-            logging.info("Record cmd_M204")
 
 def add_printer_objects(config):
     config.get_printer().add_object('toolhead', ToolHead(config))

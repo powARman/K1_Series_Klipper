@@ -26,7 +26,7 @@ choice
     config MACH_RP2040
         bool "Raspberry Pi RP2040"
     config MACH_GD32
-		bool "Giga Device GD32"
+        bool "Giga Device GD32"
     config MACH_PRU
         bool "Beaglebone PRU"
     config MACH_LINUX
@@ -47,9 +47,9 @@ source "src/linux/Kconfig"
 source "src/simulator/Kconfig"
 
 config MCU_MENU
-	string 
-	default "S" if MACH_STM32
-	default "G" if MACH_GD32
+    string 
+    default "S" if MACH_STM32
+    default "G" if MACH_GD32
 
 # Generic configuration options for serial ports
 config SERIAL
@@ -108,38 +108,21 @@ config CANBUS_FILTER
     default y if CANSERIAL
 
 # Support setting gpio state at startup
-
-choice
-    prompt "Creality machine type"
-    config MACH_CREALITY_OTHERS
-        bool "CRELITY others"
-    config MACH_CREALITY_CR_10_SMART
-        bool "CRELITY CR-10 SMART"
-    config INITIAL_PINS
-	    depends on MACH_CREALITY_CR_10_SMART
-        string 
-	    default "PA0"
-endchoice
-
 config INITIAL_PINS
     string "GPIO pins to set at micro-controller startup"
-	depends on LOW_LEVEL_OPTIONS && !MACH_CREALITY_CR_10_SMART
-	default "PA0" if MACH_CREALITY_CR_10_SMART
+    depends on LOW_LEVEL_OPTIONS
     help
         One may specify a comma separated list of gpio pins to set
         during the micro-controller startup sequence. By default the
         pins will be set to output high - preface a pin with a '!'
         character to set that pin to output low.
-        "PA0" is default value for CREALITY CR-10 SMART, and MUST NOT
-        MODIFIY! For the other machine types you should add pin name with
-        your hardware configurations.
 
 config BUILD_MACHINE_UID
-	string "Custom your machine firmware name as unique ID"
-	depends on LOW_LEVEL_OPTIONS
-	help
-		It is for klipper host making a distinction between each 
-		printer when one host controls more than one machine. 
+    string "Custom your machine firmware name as unique ID"
+    depends on LOW_LEVEL_OPTIONS
+    help
+        It is for klipper host making a distinction between each 
+        printer when one host controls more than one machine. 
 
 # The HAVE_x options allow boards to disable support for some commands
 # if the hardware does not support the feature.

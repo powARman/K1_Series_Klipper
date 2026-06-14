@@ -93,16 +93,7 @@ class HomingMove:
         try:
             self.toolhead.drip_move(movepos, speed, all_endstop_trigger)
         except self.printer.command_error as e:
-            code_key = "key20"
-            for _, name in self.endstops:
-                if name == "x":
-                    code_key = "key573"
-                elif name == "y":
-                    code_key = "key577"
-                elif name == "z":
-                    code_key = "key581"
-                break
-            error = """{"code":"%s", "msg":"Error during homing move: %s", "values": [%s]}""" % (code_key, str(e),str(e))
+            error = "Error during homing move: %s" % (str(e),)
         # Wait for endstops to trigger
         trigger_times = {}
         move_end_print_time = self.toolhead.get_last_move_time()
@@ -111,27 +102,9 @@ class HomingMove:
             if trigger_time > 0.:
                 trigger_times[name] = trigger_time
             elif trigger_time < 0. and error is None:
-                code_key = "key21"
-                for _, name in self.endstops:
-                    if name == "x":
-                        code_key = "key574"
-                    elif name == "y":
-                        code_key = "key578"
-                    elif name == "z":
-                        code_key = "key582"
-                    break
-                error = """{"code":"%s", "msg":"Communication timeout during homing %s", "values": ["%s"]}""" % (code_key, name, name)
+                error = "Communication timeout during homing %s" % (name,)
             elif check_triggered and error is None:
-                code_key = "key22"
-                for _, name in self.endstops:
-                    if name == "x":
-                        code_key = "key575"
-                    elif name == "y":
-                        code_key = "key579"
-                    elif name == "z":
-                        code_key = "key583"
-                    break
-                error = """{"code":"%s", "msg":"No trigger on %s after full movement", "values": ["%s"]}""" % (code_key, name, name)
+                error = "No trigger on %s after full movement" % (name,)
         # Determine stepper halt positions
         self.toolhead.flush_step_generation()
         for sp in self.stepper_positions:
@@ -232,18 +205,9 @@ class Homing:
             hmove = HomingMove(self.printer, endstops)
             hmove.homing_move(homepos, hi.second_homing_speed)
             if hmove.check_no_movement() is not None:
-                code_key = "key23"
-                for _, name in endstops:
-                    if name == "x":
-                        code_key = "key576"
-                    elif name == "y":
-                        code_key = "key580"
-                    elif name == "z":
-                        code_key = "key584"
-                    break
                 raise self.printer.command_error(
-                    """{"code":%s, "msg":"Endstop %s still triggered after retract", "values": ["%s"]}"""
-                    % (code_key, hmove.check_no_movement(), hmove.check_no_movement()))
+                    "Endstop %s still triggered after retract"
+                    % (hmove.check_no_movement(),))
         # Signal home operation complete
         self.toolhead.flush_step_generation()
         self.trigger_mcu_pos = {sp.stepper_name: sp.trig_pos
@@ -268,7 +232,6 @@ class PrinterHoming:
         # Register g-code commands
         gcode = self.printer.lookup_object('gcode')
         gcode.register_command('G28', self.cmd_G28)
-        gcode.register_command('STEPPER_Z_SENEORLESS', self.cmd_STEPPER_Z_SENEORLESS)
         self.probe_type = ""
         if config.has_section('prtouch_v2'):
             self.probe_type = "prtouch_v2"
@@ -283,10 +246,9 @@ class PrinterHoming:
         except self.printer.command_error:
             if self.printer.is_shutdown():
                 raise self.printer.command_error(
-                    '{"code": "key4", "msg": "Homing failed due to printer shutdown"}')
+                    "Homing failed due to printer shutdown")
             raise
     def probing_move(self, mcu_probe, pos, speed):
-
         endstops = [(mcu_probe, "probe")]
         hmove = HomingMove(self.printer, endstops)
         try:
@@ -297,31 +259,12 @@ class PrinterHoming:
         except self.printer.command_error:
             if self.printer.is_shutdown():
                 raise self.printer.command_error(
-                    '{"code": "key5", "msg": "Probing failed due to printer shutdown"}')
+                    "Probing failed due to printer shutdown")
             raise
         if hmove.check_no_movement() is not None:
             raise self.printer.command_error(
-                '{"code": "key6", "msg": "Probe triggered prior to movement"}')
+                "Probe triggered prior to movement")
         return epos
-        
-    def cmd_STEPPER_Z_SENEORLESS(self, gcmd):
-        toolhead = self.printer.lookup_object('toolhead')
-        move_dist = gcmd.get_int('MOVE_DIST', default=0, minval=0, maxval=30)
-        homing_state = Homing(self.printer)
-        homing_state.set_axes([2])
-        kin = self.printer.lookup_object('toolhead').get_kinematics()
-        homing_state.set_axes([2])
-        # gcode = self.printer.lookup_object('gcode')
-        # gcode.respond_info("cmd_STEPPER_Z_SENEORLESS")
-        kin.home_z_with_sensorless(homing_state, move_dist)
-        # gcode = self.printer.lookup_object('gcode')
-        pos = toolhead.get_position()
-        pos[2] = move_dist - 3
-        toolhead.set_position(pos, homing_axes=[2])
-        toolhead.manual_move([None, None, 0.], 5)
-        if hasattr(toolhead.get_kinematics(), "note_z_not_homed"):
-            toolhead.get_kinematics().note_z_not_homed()
-
     def cmd_G28(self, gcmd):
         # Move to origin
         axes = []
@@ -343,7 +286,7 @@ class PrinterHoming:
                         result = self.printer.lookup_object('probe').mcu_probe.run_G28_Z()
                         if not result:
                             gcode = self.printer.lookup_object('gcode')
-                            gcode.respond_info("""{"code": "key581", "msg":"Error during homing move", "values": []}""")
+                            gcode.respond_info("Error during homing move")
             else:
                 kin.home(homing_state)
         except self.printer.command_error:

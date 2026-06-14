@@ -16,8 +16,7 @@ class InputShaperParams:
         self.shaper_type = config.get('shaper_type_' + axis, shaper_type)
         if self.shaper_type not in self.shapers:
             raise config.error(
-                    """{"code":"key24", "msg":"Unsupported shaper type: %s", "values": ["%s"]}""" % (
-                        self.shaper_type, self.shaper_type))
+                    'Unsupported shaper type: %s' % (self.shaper_type,))
         self.damping_ratio = config.getfloat('damping_ratio_' + axis,
                                              shaper_defs.DEFAULT_DAMPING_RATIO,
                                              minval=0., maxval=1.)
@@ -33,8 +32,7 @@ class InputShaperParams:
         if shaper_type is None:
             shaper_type = gcmd.get('SHAPER_TYPE_' + axis, self.shaper_type)
         if shaper_type.lower() not in self.shapers:
-            raise gcmd.error("""{"code":"key24", "msg":"Unsupported shaper type: %s", "values": ["%s"]}""" % (
-                shaper_type, shaper_type))
+            raise gcmd.error('Unsupported shaper type: %s' % (shaper_type,))
         self.shaper_type = shaper_type.lower()
     def get_shaper(self):
         if not self.shaper_freq:
@@ -107,9 +105,6 @@ class InputShaper:
         gcode.register_command("SET_INPUT_SHAPER",
                                self.cmd_SET_INPUT_SHAPER,
                                desc=self.cmd_SET_INPUT_SHAPER_help)
-        gcode.register_command("UPDATE_INPUT_SHAPER",
-                               self.cmd_UPDATE_INPUT_SHAPER,
-                               desc=self.cmd_UPDATE_INPUT_SHAPER_help)
     def get_shapers(self):
         return self.shapers
     def connect(self):
@@ -144,8 +139,8 @@ class InputShaper:
                     failed.append(shaper)
         if failed:
             error = error or self.printer.command_error
-            raise error("""{"code":"key25", "msg":"Failed to configure shaper(s) %s with given parameters", "values": ["%s"]}"""
-                        % (', '.join([s.get_name() for s in failed]), ', '.join([s.get_name() for s in failed])))
+            raise error("Failed to configure shaper(s) %s with given parameters"
+                        % (', '.join([s.get_name() for s in failed])))
     def disable_shaping(self):
         for shaper in self.shapers:
             shaper.disable_shaping()
@@ -163,9 +158,6 @@ class InputShaper:
             self._update_input_shaping()
         for shaper in self.shapers:
             shaper.report(gcmd)
-    cmd_UPDATE_INPUT_SHAPER_help = "cmd_UPDATE_INPUT_SHAPER parameters for input shaper"
-    def cmd_UPDATE_INPUT_SHAPER(self, gcmd):
-        self.connect()
 
 def load_config(config):
     return InputShaper(config)

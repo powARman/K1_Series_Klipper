@@ -25,8 +25,6 @@ class CUSTOM_MACRO:
         self.nozzle_clear = config.getboolean('nozzle_clear', True)
         self.calibration = config.getint('calibration', default=0)
         self.leveling_calibration = 0
-        self.qmode_flag = 0
-        self.gcode.register_command("SET_QMODE_FLAG", self.cmd_SET_QMODE_FLAG, desc=self.cmd_SET_QMODE_FLAG_help)
         pass
 
 
@@ -36,7 +34,6 @@ class CUSTOM_MACRO:
             'default_extruder_temp': self.default_extruder_temp,
             'default_bed_temp': self.default_bed_temp,
             'g28_ext_temp': self.g28_ext_temp,
-            'qmode_flag': self.qmode_flag
         }
 
     cmd_CX_PRINT_LEVELING_CALIBRATION_help = "Start Print function,three parameter:EXTRUDER_TEMP(180-300),BED_TEMP(0-100),CALIBRATION(0 or 1)"
@@ -119,25 +116,6 @@ class CUSTOM_MACRO:
     cmd_CX_NOZZLE_CLEAR_help = "nozzle clear with temperature"
     def cmd_CX_NOZZLE_CLEAR(self, gcmd):
         self.gcode.run_script_from_command('NOZZLE_CLEAR HOT_MIN_TEMP=%d HOT_MAX_TEMP=%d BED_MAX_TEMP=%d' % (self.g28_ext_temp, self.extruder_temp - 20, self.bed_temp))
-        pass
-    cmd_SET_QMODE_FLAG_help = "set qmode flag"
-    def cmd_SET_QMODE_FLAG(self, gcmd):
-        self.qmode_flag =  gcmd.get_int('FLAG', default=1, minval=0, maxval=1)
-        gcmd.respond_info("[cmd_SET_QMODE_FLAG] self.qmode_flag={}".format(self.qmode_flag))
-        import json, logging
-        try:
-            print_stats = self.printer.lookup_object('print_stats')
-            v_sd = self.printer.lookup_object('virtual_sdcard')
-            speed_mode_path = v_sd.speed_mode_path
-            if print_stats.state == "printing" and self.qmode_flag == 1:
-                result = {}
-                result["speed_mode"] = 2
-                with open(speed_mode_path, "w") as f:
-                    f.write(json.dumps(result))
-                    f.flush()
-        except Exception as err:
-            err_msg = "cmd_SET_QMODE_FLAG err %s" % str(err)
-            logging.error(err_msg)
         pass
 
 def load_config(config):

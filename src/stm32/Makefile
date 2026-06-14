@@ -34,7 +34,6 @@ $(OUT)klipper.elf: $(OUT)src/generic/armcm_link.ld
 src-y += stm32/watchdog.c stm32/gpio.c stm32/clockline.c stm32/dfu_reboot.c
 src-y += generic/crc16_ccitt.c
 src-y += generic/armcm_boot.c generic/armcm_irq.c generic/armcm_reset.c
-
 src-$(CONFIG_MACH_STM32F0) += ../lib/stm32f0/system_stm32f0xx.c
 src-$(CONFIG_MACH_STM32F0) += generic/timer_irq.c stm32/stm32f0_timer.c
 src-$(CONFIG_MACH_STM32F0) += stm32/stm32f0.c stm32/gpioperiph.c

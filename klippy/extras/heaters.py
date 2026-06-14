@@ -96,8 +96,8 @@ class Heater:
     def set_temp(self, degrees):
         if degrees and (degrees < self.min_temp or degrees > self.max_temp):
             raise self.printer.command_error(
-                """{"code":"key340", "msg":"Heaters %s Requested temperature (%.1f) out of range (%.1f:%.1f)", "values":["%s", %.1f, %.1f, %.1f]}"""
-                % (self.name, degrees, self.min_temp, self.max_temp, self.name, degrees, self.min_temp, self.max_temp))
+                "Requested temperature (%.1f) out of range (%.1f:%.1f)"
+                % (degrees, self.min_temp, self.max_temp))
         with self.lock:
             self.target_temp = degrees
     def get_temp(self, eventtime):
@@ -171,8 +171,6 @@ class ControlBangBang:
                 if self.old_temp <= 0.01 or self.old_temp < temp:
                     self.old_temp = temp
                     self.cnt_temp = 0
-                    # self.diff_tempa = 16.1 + (119-16.1)/100.*(target_temp-20.0)
-                    # self.diff_tempb = 16.3 + (119.5-16.3)/100.*(target_temp-20.0)
                     self.diff_tempa = 16.1 + 1.029 * (target_temp-20.0)
                     self.diff_tempb = 16.3 + 1.032 * (target_temp-20.0)
                 elif self.old_temp > temp:
@@ -180,8 +178,6 @@ class ControlBangBang:
                     if self.cnt_temp > 10:
                         self.long_temp =False
             else:
-                # self.diff_tempa = 19.1 + (119.7-19.1)/100.*(target_temp-20.0)
-                # self.diff_tempb = 19.3 + (120.2-19.3)/100.*(target_temp-20.0)
                 self.diff_tempa = 19.1 + 1.006 * (target_temp-20.0)
                 self.diff_tempb = 19.3 + 1.009 * (target_temp-20.0)
             if self.heating and temp >= self.diff_tempb:
@@ -222,7 +218,6 @@ class ControlBangBang:
                 self.prev_temp = 0.
                 self.temp_coff = 1.0
     def check_busy(self, eventtime, smoothed_temp, target_temp):
-
         return smoothed_temp < target_temp-self.max_delta
 
 
@@ -235,8 +230,6 @@ PID_SETTLE_SLOPE = .5
 
 class ControlPID:
     def __init__(self, heater, config):
-        self.printer = config.get_printer()
-        self.oldco = 0
         self.heater = heater
         self.heater_max_power = heater.get_max_power()
         self.Kp = config.getfloat('pid_Kp') / PID_PARAM_BASE
@@ -268,18 +261,6 @@ class ControlPID:
         #logging.debug("pid: %f@%.3f -> diff=%f deriv=%f err=%f integ=%f co=%d",
         #    temp, read_time, temp_diff, temp_deriv, temp_err, temp_integ, co)
         bounded_co = max(0., min(self.heater_max_power, co))
-       # self.powerpin = self.printer.lookup_object("power_pin")
-
-        # bounded_co = max(0., min(self.heater_max_power, co))
-        # if bounded_co == self.heater_max_power:
-        #     if self.oldco == 0:
-        #       #  self.powerpin.set_power_pin(0)
-        #         self.oldco = self.heater_max_power
-        #     else:
-        #         if self.oldco == self.heater_max_power:
-        #           #  self.powerpin.set_power_pin(1)
-        #
-        #         self.oldco = 0
         self.heater.set_pwm(read_time, bounded_co)
         # Store state for next measurement
         self.prev_temp = temp
@@ -288,11 +269,7 @@ class ControlPID:
         if co == bounded_co:
             self.prev_temp_integ = temp_integ
     def check_busy(self, eventtime, smoothed_temp, target_temp):
-
         temp_diff = target_temp - smoothed_temp
-
-
-
         return (abs(temp_diff) > PID_SETTLE_DELTA
                 or abs(self.prev_temp_deriv) > PID_SETTLE_SLOPE)
 
@@ -394,7 +371,6 @@ class PrinterHeaters:
     def turn_off_all_heaters(self, print_time=0.):
         for heater in self.heaters.values():
             heater.set_temp(0.)
-
     cmd_TURN_OFF_HEATERS_help = "Turn off all heaters"
     def cmd_TURN_OFF_HEATERS(self, gcmd):
         self.turn_off_all_heaters()
@@ -432,15 +408,10 @@ class PrinterHeaters:
             self.bed_temperature_wait = True
         else:
             self.extruder_temperature_wait = True
-        while not self.printer.is_shutdown() and heater.check_busy(eventtime) :
+        while not self.printer.is_shutdown() and heater.check_busy(eventtime):
             if self.can_break:
                 self.can_break_flag = 2
                 self.can_break = False
-                # toolhead._handle_shutdown()
-                #toolhead.move_queue.reset()
-                # self.turn_off_all_heaters()
-                #gcode.run_script("G28")
-
                 break
             print_time = toolhead.get_last_move_time()
             gcode.respond_raw(self._get_temp(eventtime))

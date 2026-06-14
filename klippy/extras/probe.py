@@ -118,7 +118,7 @@ class PrinterProbe:
         toolhead = self.printer.lookup_object('toolhead')
         curtime = self.printer.get_reactor().monotonic()
         if 'z' not in toolhead.get_status(curtime)['homed_axes']:
-            raise self.printer.command_error("""{"code":"key96", "msg": "Must home before probe", "values": []}""")
+            raise self.printer.command_error("Must home before probe")
         phoming = self.printer.lookup_object('homing')
         pos = toolhead.get_position()
         pos[2] = self.z_position
@@ -272,36 +272,19 @@ class PrinterProbe:
     def cmd_Z_OFFSET_APPLY_PROBE(self,gcmd):
         offset = self.gcode_move.get_status()['homing_origin'].z
         configfile = self.printer.lookup_object('configfile')
-        # if offset == 0:
-        #     self.gcode.respond_info("Nothing to do: Z Offset is 0")
-        # else:
-        new_calibrate = self.z_offset - offset
-        self.gcode.respond_info(
-            "%s: z_offset: %.3f\n"
-            "The SAVE_CONFIG command will update the printer config file\n"
-            "with the above and restart the printer."
-            % (self.name, new_calibrate))
-        configfile.set(self.name, 'z_offset', "%.3f" % (new_calibrate,))
-        self.z_offset_calibrate = new_calibrate
-        self.z_offset_change_flag = True
-        self.record_gcode_offset_when_printing()
+        if offset == 0:
+            self.gcode.respond_info("Nothing to do: Z Offset is 0")
+        else:
+            new_calibrate = self.z_offset - offset
+            self.gcode.respond_info(
+                "%s: z_offset: %.3f\n"
+                "The SAVE_CONFIG command will update the printer config file\n"
+                "with the above and restart the printer."
+                % (self.name, new_calibrate))
+            configfile.set(self.name, 'z_offset', "%.3f" % (new_calibrate,))
+            self.z_offset_calibrate = new_calibrate
+            self.z_offset_change_flag = True
     cmd_Z_OFFSET_APPLY_PROBE_help = "Adjust the probe's z_offset"
-
-    def record_gcode_offset_when_printing(self):
-        import os, json
-        try:
-            configfile = self.printer.lookup_object('configfile')
-            print_stats = self.printer.load_object(configfile, 'print_stats')
-            v_sd = self.printer.lookup_object('virtual_sdcard')
-            if print_stats and print_stats.state == "printing" and os.path.exists(v_sd.print_file_name_path) and self.z_offset_change_flag:
-                with open(v_sd.print_file_name_path, "r") as f:
-                    result = (json.loads(f.read()))
-                    result["SET_GCODE_OFFSET"] = self.z_offset_calibrate
-                with open(v_sd.print_file_name_path, "w") as f:
-                    f.write(json.dumps(result))
-                    f.flush()
-        except Exception as err:
-            logging.error("record_gcode_offset_when_printing error: %s" % err)
 
 # Endstop wrapper that enables probe specific features
 class ProbeEndstopWrapper:
@@ -399,7 +382,7 @@ class ProbePointsHelper:
     def minimum_points(self,n):
         if len(self.probe_points) < n:
             raise self.printer.config_error(
-                """{"code":"key98", "msg": "Need at least %d probe points for %s", "values": [%d, "%s"]}""" % (n, self.name, n, self.name))
+                "Need at least %d probe points for %s" % (n, self.name))
     def update_probe_points(self, points, min_points):
         self.probe_points = points
         self.minimum_points(min_points)
@@ -449,12 +432,9 @@ class ProbePointsHelper:
         self.lift_speed = probe.get_lift_speed(gcmd)
         self.probe_offsets = probe.get_offsets()
         if self.horizontal_move_z < self.probe_offsets[2]:
-            raise gcmd.error("""{"code": "key15", "msg": "horizontal_move_z can't be less than probe's z_offset"}""")
+            raise gcmd.error("horizontal_move_z can't be less than"
+                             " probe's z_offset")
         probe.multi_probe_begin()
-        # gcode = self.printer.lookup_object('gcode')
-        # g28_gcmd = gcode.create_gcode_command("G28", "G28", {'X': '0', 'Y': '0', 'Z': '0'})
-        # self.safe_z_home = self.printer.lookup_object('safe_z_home')
-        # self.safe_z_home.cmd_G28(g28_gcmd)
         while 1:
             done = self._move_next()
             if done:

@@ -15,10 +15,10 @@
 
 /*
  *********************************************************************
-		The format of frimware version string is Xy.y.y. This X 
-		stands for MCU menufacturer, S is for STMicroelectornics 
-		and A is for Artery. y.y.y is building sequence number that  
-	   	starts at 0.0.1.	
+    The format of frimware version string is Xy.y.y. This X
+    stands for MCU menufacturer, S is for STMicroelectornics
+    and A is for Artery. y.y.y is building sequence number that
+    starts at 0.0.1.
  **********************************************************************
 */
 #include "autoconf.h"

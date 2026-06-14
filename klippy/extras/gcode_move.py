@@ -7,10 +7,6 @@ import logging
 
 class GCodeMove:
     def __init__(self, config):
-        self.variable_safe_z = 0
-        if config.has_section('gcode_macro PRINTER_PARAM'):
-            PRINTER_PARAM = config.getsection('gcode_macro PRINTER_PARAM')
-            self.variable_safe_z = PRINTER_PARAM.getfloat('variable_z_safe_g28', 0.0)
         self.printer = printer = config.get_printer()
         printer.register_event_handler("klippy:ready", self._handle_ready)
         printer.register_event_handler("klippy:shutdown", self._handle_shutdown)
@@ -40,7 +36,6 @@ class GCodeMove:
         gcode.register_command('M114', self.cmd_M114, True)
         gcode.register_command('GET_POSITION', self.cmd_GET_POSITION, True,
                                desc=self.cmd_GET_POSITION_help)
-        gcode.register_command('SET_POSITION', self.cmd_SET_POSITION, True, desc=self.cmd_SET_POSITION_help)
         self.Coord = gcode.Coord
         # G-Code coordinate manipulation
         self.absolute_coord = self.absolute_extrude = True
@@ -139,12 +134,12 @@ class GCodeMove:
             if 'F' in params:
                 gcode_speed = float(params['F'])
                 if gcode_speed <= 0.:
-                    raise gcmd.error("""{"code":"key272": "msg":"Invalid speed in '%s'", "values":["%s"]}"""
-                                     % (gcmd.get_commandline(),gcmd.get_commandline()))
+                    raise gcmd.error("Invalid speed in '%s'"
+                                     % (gcmd.get_commandline(),))
                 self.speed = gcode_speed * self.speed_factor
         except ValueError as e:
-            raise gcmd.error("""{"code":"key273": "msg":"Unable to parse move '%s'", "values":["%s"]}"""
-                             % (gcmd.get_commandline(),gcmd.get_commandline()))
+            raise gcmd.error("Unable to parse move '%s'"
+                             % (gcmd.get_commandline(),))
         self.move_with_transform(self.last_position, self.speed)
     # G-Code coordinate manipulation
     def cmd_G20(self, gcmd):
@@ -184,22 +179,6 @@ class GCodeMove:
         value = gcmd.get_float('S', 100., above=0.) / (60. * 100.)
         self.speed = self._get_gcode_speed() * value
         self.speed_factor = value
-        import json
-        try:
-            SAVE = int(gcmd.get('SAVE', 0))
-            speed_S = int(gcmd.get_float('S', 100., above=0.))
-            v_sd = self.printer.lookup_object('virtual_sdcard')
-            speed_mode_path = v_sd.speed_mode_path
-            if SAVE==1:
-                result = {}
-                result["speed_mode"] = 1
-                result["value"] = speed_S
-                with open(speed_mode_path, "w") as f:
-                    f.write(json.dumps(result))
-                    f.flush()
-        except Exception as err:
-            err_msg = "cmd_M220 err %s" % str(err)
-            logging.error(err_msg)
     def cmd_M221(self, gcmd):
         # Set extrude factor override percentage
         new_extrude_factor = gcmd.get_float('S', 100., above=0.) / 100.
@@ -207,20 +186,6 @@ class GCodeMove:
         e_value = (last_e_pos - self.base_position[3]) / self.extrude_factor
         self.base_position[3] = last_e_pos - e_value * new_extrude_factor
         self.extrude_factor = new_extrude_factor
-        import json
-        try:
-            SAVE = int(gcmd.get('SAVE', 0))
-            speed_S = int(gcmd.get_float('S', 100., above=0.))
-            v_sd = self.printer.lookup_object('virtual_sdcard')
-            if SAVE==1:
-                result = {}
-                result["value"] = speed_S
-                with open(v_sd.flow_rate_path, "w") as f:
-                    f.write(json.dumps(result))
-                    f.flush()
-        except Exception as err:
-            err_msg = "cmd_M221 err %s" % str(err)
-            logging.error(err_msg)
     cmd_SET_GCODE_OFFSET_help = "Set a virtual offset to g-code positions"
     def cmd_SET_GCODE_OFFSET(self, gcmd):
         move_delta = [0., 0., 0., 0.]
@@ -241,185 +206,6 @@ class GCodeMove:
             for pos, delta in enumerate(move_delta):
                 self.last_position[pos] += delta
             self.move_with_transform(self.last_position, speed)
-    def recordPrintFileName(self, path, file_name, fan_state={}, filament_used=0, last_print_duration=0, pressure_advance=""):
-        import json, os
-        fan = {}
-        M204_accel = ""
-        old_filament_used = 0
-        old_last_print_duration = 0
-        old_pressure_advance = ""
-        set_gcode_offset = -5
-        if os.path.exists(path):
-            with open(path, "r") as f:
-                result = (json.loads(f.read()))
-                # fan = result.get("fan_state", "")
-                fan = result.get("fan_state", {})
-                M204_accel = result.get("M204", "")
-                old_filament_used = result.get("filament_used", 0)
-                old_last_print_duration = result.get("last_print_duration", 0)
-                set_gcode_offset = result.get("SET_GCODE_OFFSET", -5)
-                old_pressure_advance = result.get("pressure_advance", "")
-        if fan_state.get("M106 S") and fan_state.get("M106 S", "") != fan.get("M106 S", ""):
-            fan["M106 S"] = fan_state.get("M106 S")
-        elif fan_state.get("M106 P0") and fan_state.get("M106 P0", "") != fan.get("M106 P0", ""):
-            fan["M106 P0"] = fan_state.get("M106 P0")
-        elif fan_state.get("M106 P1")  and fan_state.get("M106 P1", "") != fan.get("M106 P1", ""):
-            fan["M106 P1"] = fan_state.get("M106 P1")
-        elif fan_state.get("M106 P2")  and fan_state.get("M106 P2", "") != fan.get("M106 P2", ""):
-            fan["M106 P2"] = fan_state.get("M106 P2")
-
-        if filament_used and filament_used != old_filament_used:
-            pass
-        else:
-            filament_used = old_filament_used
-        if last_print_duration and last_print_duration != old_last_print_duration:
-            pass
-        else:
-            last_print_duration = old_last_print_duration
-        if pressure_advance and pressure_advance != old_pressure_advance:
-            pass
-        else:
-            pressure_advance = old_pressure_advance
-        data = {
-            'file_path': file_name,
-            'absolute_coord': self.absolute_coord,
-            'absolute_extrude': self.absolute_extrude,
-            # 'fan_state': state,
-            'fan_state': fan,
-            'M204': M204_accel,
-            'filament_used': filament_used,
-            'last_print_duration': last_print_duration,
-            'SET_GCODE_OFFSET': set_gcode_offset,
-            'pressure_advance': pressure_advance
-        }
-        with open(path, "w") as f:
-            f.write(json.dumps(data))
-            f.flush()
-    cmd_CX_RESTORE_GCODE_STATE_help = "Restore a previously saved G-Code state"
-    def cmd_CX_RESTORE_GCODE_STATE(self, print_info, file_name_path, XYZE):
-        try:
-            state = {
-                "absolute_extrude": True,
-                "file_position": 0,
-                "extrude_factor": 1.0,
-                "speed_factor": 0.016,
-                "homing_position": [0.0, 0.0, 0.0, 0.0],
-                "last_position": [0.0, 0.0, 0.0, 0.0],
-                "speed": 25.0,
-                "file_path": "",
-                "base_position": [0.0, 0.0, 0.0, -0.0],
-                "absolute_coord": True,
-                # "fan_state": "",
-                "fan_state": {},
-                "variable_z_safe_pause": 0,
-                "M204": "",
-                "filament_used": 0,
-                "last_print_duration": 0,
-                "pressure_advance": ""
-            }
-            import os, json
-            base_position_e = -1
-            state["file_position"] = print_info.get("file_position", 0)
-            state["base_position"] = [0.0, 0.0, 0.0, print_info.get("base_position_e", -1)]
-            base_position_e = print_info.get("base_position_e", -1)
-            logging.info("power_loss cmd_CX_RESTORE_GCODE_STATE base_position_e:%s" % base_position_e)
-            with open(file_name_path, "r") as f:
-                file_info = json.loads(f.read())
-                state["file_path"] = file_info.get("file_path", "")
-                state["absolute_extrude"] = file_info.get("absolute_extrude", True)
-                state["absolute_coord"] = file_info.get("absolute_coord", True)
-                state["fan_state"] = file_info.get("fan_state", {})
-                state["variable_z_safe_pause"] = file_info.get("variable_z_safe_pause", 0)
-                state["M204"] = file_info.get("M204", "")
-                state["SET_GCODE_OFFSET"] = file_info.get("SET_GCODE_OFFSET", -5)
-                state["pressure_advance"] = file_info.get("pressure_advance", "")
-            state["last_position"] = [XYZE["X"], XYZE["Y"], XYZE["Z"], XYZE["E"]+base_position_e]
-            logging.info("power_loss cmd_CX_RESTORE_GCODE_STATE state:%s" % str(state))
-
-            # Restore state
-            self.absolute_coord = state['absolute_coord']
-            # self.absolute_extrude = state['absolute_extrude']
-            self.base_position = list(state['base_position'])
-            self.homing_position = list(state['homing_position'])
-            self.speed = state['speed']
-            self.speed_factor = state['speed_factor']
-            self.extrude_factor = state['extrude_factor']
-            # Restore the relative E position
-            logging.info("power_loss cmd_CX_RESTORE_GCODE_STATE base_position:%s" % str(self.base_position))
-            e_diff = self.last_position[3] - state['last_position'][3] - 0.7 + 5.0
-            self.base_position[3] += e_diff 
-            logging.info("power_loss cmd_CX_RESTORE_GCODE_STATE self.last_position[3]:%s, state['last_position'][3]:%s, e_diff:%s, \
-                         base_position[3]:%s" % (self.last_position[3], state['last_position'][3], e_diff, self.base_position[3]))
-            # Move the toolhead back if requested
-            gcode = self.printer.lookup_object('gcode')
-            if state["fan_state"]:
-                logging.info("power_loss cmd_CX_RESTORE_GCODE_STATE fan fan_state:%s" % str(state["fan_state"]))
-                for key in state["fan_state"]:
-                    logging.info("power_loss cmd_CX_RESTORE_GCODE_STATE fan set fan:%s#" % str(state["fan_state"].get(key, "")))
-                    gcode.run_script_from_command(state["fan_state"].get(key, ""))
-                # gcode.run_script_from_command(state["fan_state"])
-            logging.info("power_loss cmd_CX_RESTORE_GCODE_STATE before G28 X Y self.last_position:%s" % str(self.last_position))
-            gcode.run_script_from_command("G28 X Y")
-            logging.info("power_loss cmd_CX_RESTORE_GCODE_STATE after G28 X Y self.last_position:%s" % str(self.last_position))
-            logging.info("power_loss cmd_CX_RESTORE_GCODE_STATE before BED_MESH_PROFILE LOAD='default'")
-            gcode.run_script_from_command('BED_MESH_PROFILE LOAD="default"')
-            logging.info("power_loss cmd_CX_RESTORE_GCODE_STATE after BED_MESH_PROFILE LOAD='default'")
-            x = self.last_position[0]
-            y = self.last_position[1]
-            z = state['last_position'][2] + self.variable_safe_z + state["variable_z_safe_pause"]
-            logging.info("power_loss cmd_CX_RESTORE_GCODE_STATE self.last_position[2]:%s, state['last_position'][2]:%s, self.variable_safe_z:%s, \
-                state['variable_z_safe_pause']:%s" % (self.last_position[2], state['last_position'][2], self.variable_safe_z, state["variable_z_safe_pause"]))
-            toolhead = self.printer.lookup_object("toolhead")
-            logging.info("power_loss cmd_CX_RESTORE_GCODE_STATE toolhead.set_position:%s" % str([x, y, z, self.last_position[3]]))
-            toolhead.set_position([x, y, z, self.last_position[3]], homing_axes=(2,))
-            speed = self.speed
-            self.last_position[:3] = state['last_position'][:3]
-            logging.info("power_loss cmd_CX_RESTORE_GCODE_STATE G1 X%s Y%s F3000" % (state['last_position'][0], state['last_position'][1]))
-            gcode.run_script_from_command("G1 X%s Y%s F3000" % (state['last_position'][0], state['last_position'][1]))
-            logging.info("power_loss cmd_CX_RESTORE_GCODE_STATE move_with_transform:%s, speed:%s" % (self.last_position, speed))
-            self.move_with_transform(self.last_position, speed)
-            logging.info("power_loss cmd_CX_RESTORE_GCODE_STATE G1 X%s Y%s F3000" % (state['last_position'][0], state['last_position'][1]))
-            gcode.run_script_from_command("G1 X%s Y%s F3000" % (state['last_position'][0], state['last_position'][1]))
-            logging.info("power_loss cmd_CX_RESTORE_GCODE_STATE M400")
-            gcode.run_script_from_command("M400")
-            if state["M204"]:
-                logging.info("power_loss cmd_CX_RESTORE_GCODE_STATE SET M204:%s#" % state["M204"])
-                gcode.run_script_from_command(state["M204"])
-            self.absolute_extrude = state['absolute_extrude']
-            try:
-                if os.path.exists(gcode.exclude_object_info):
-                    with open(gcode.exclude_object_info, "r") as f:
-                        exclude_object_cmds = json.loads(f.read())
-                        EXCLUDE_OBJECT_DEFINE = exclude_object_cmds.get("EXCLUDE_OBJECT_DEFINE", [])
-                        EXCLUDE_OBJECT = exclude_object_cmds.get("EXCLUDE_OBJECT", [])
-                        for line in EXCLUDE_OBJECT_DEFINE:
-                            gcode.run_script_from_command(line)
-                        for line in EXCLUDE_OBJECT:
-                            gcode.run_script_from_command(line)
-                        gcode.run_script_from_command("M400")
-            except Exception as err:
-                logging.exception("RESTORE EXCLUDE_OBJECT err:%s" % err)
-            try:
-                if state["SET_GCODE_OFFSET"] != -5:
-                    if state["SET_GCODE_OFFSET"] > 0:
-                        params = "-%.3f" % state["SET_GCODE_OFFSET"]
-                    elif state["SET_GCODE_OFFSET"] < 0:
-                        params = "%.3f" % abs(state["SET_GCODE_OFFSET"])
-                    else:
-                        params = "0"
-                    gcode.run_script_from_command("SET_GCODE_OFFSET Z_ADJUST=%s MOVE=0" % params)
-                    gcode.run_script_from_command("Z_OFFSET_APPLY_PROBE")
-                    gcode.run_script_from_command("M400")
-                    logging.info("power_loss SET_GCODE_OFFSET Z_ADJUST:-%s MOVE=0" % state["SET_GCODE_OFFSET"])
-            except Exception as err:
-                logging.error("RESTORE SET_GCODE_OFFSET err:%s" % err)
-            if state["pressure_advance"]:
-                gcode.run_script_from_command("M400")
-                logging.info("power_loss cmd_CX_RESTORE_GCODE_STATE SET pressure_advance:%s#" % state["pressure_advance"])
-                gcode.run_script_from_command(state["pressure_advance"])
-            logging.info("power_loss cmd_CX_RESTORE_GCODE_STATE done")
-        except Exception as err:
-            logging.exception("cmd_CX_RESTORE_GCODE_STATE err:%s" % err)
     cmd_SAVE_GCODE_STATE_help = "Save G-Code coordinate state"
     def cmd_SAVE_GCODE_STATE(self, gcmd):
         state_name = gcmd.get('NAME', 'default')
@@ -437,7 +223,7 @@ class GCodeMove:
         state_name = gcmd.get('NAME', 'default')
         state = self.saved_states.get(state_name)
         if state is None:
-            raise gcmd.error("""{"code":"key274", "msg": "Unknown g-code state: %s", "values":["%s"]}""" % (state_name, state_name))
+            raise gcmd.error("Unknown g-code state: %s" % (state_name,))
         # Restore state
         self.absolute_coord = state['absolute_coord']
         self.absolute_extrude = state['absolute_extrude']
@@ -459,7 +245,7 @@ class GCodeMove:
     def cmd_GET_POSITION(self, gcmd):
         toolhead = self.printer.lookup_object('toolhead', None)
         if toolhead is None:
-            raise gcmd.error("""{"code": "key283", "msg": ""Printer not ready"}""")
+            raise gcmd.error("Printer not ready")
         kin = toolhead.get_kinematics()
         steppers = kin.get_steppers()
         mcu_pos = " ".join(["%s:%d" % (s.get_name(), s.get_mcu_position())
@@ -486,24 +272,5 @@ class GCodeMove:
                           % (mcu_pos, stepper_pos, kin_pos, toolhead_pos,
                              gcode_pos, base_pos, homing_pos))
 
-    cmd_SET_POSITION_help = (
-        "SET_POSITION information on the current location of the toolhead")
-    def cmd_SET_POSITION(self, gcmd):
-        toolhead = self.printer.lookup_object('toolhead', None)
-        if toolhead is None:
-            raise gcmd.error("""{"code": "key283", "msg": ""Printer not ready"}""")
-        position = toolhead.get_position()
-        x = position[0]
-        y = position[1]
-        z = position[2]
-        e = position[3]
-        X = gcmd.get_float('X', x)
-        Y = gcmd.get_float('Y', y)
-        Z = gcmd.get_float('Z', z)
-        E = gcmd.get_float('E', e)
-        toolhead.set_position([X, Y, Z, E], homing_axes=(2,))
-        position = toolhead.get_position()
-        msg = "toolhead get_position X:%s, Y:%s, Z:%s, E:%s" % (position[0], position[1], position[2], position[3])
-        gcmd.respond_info(msg)
 def load_config(config):
     return GCodeMove(config)

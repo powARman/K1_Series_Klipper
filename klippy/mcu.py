@@ -159,8 +159,8 @@ class MCU_endstop:
                 for s in ot.get_steppers():
                     if ot is not trsync and s.get_name().startswith(sname[:9]):
                         cerror = self._mcu.get_printer().config_error
-                        raise cerror("""{"code": "key287", "msg": "Multi-mcu homing not supported on multi-mcu shared axis", "values":[]}""")
-
+                        raise cerror("Multi-mcu homing not supported on"
+                                     " multi-mcu shared axis")
     def get_steppers(self):
         return [s for trsync in self._trsyncs for s in trsync.get_steppers()]
     def _build_config(self):
@@ -245,7 +245,7 @@ class MCU_digital_out:
         self._max_duration = max_duration
     def setup_start_value(self, start_value, shutdown_value, is_static=False):
         if is_static and start_value != shutdown_value:
-            raise pins.error("""{"code": "key288", "msg": "Static pin can not have shutdown value", "values":[]}""")
+            raise pins.error("Static pin can not have shutdown value")
         self._start_value = (not not start_value) ^ self._invert
         self._shutdown_value = (not not shutdown_value) ^ self._invert
         self._is_static = is_static
@@ -255,11 +255,11 @@ class MCU_digital_out:
                                      % (self._pin, self._start_value))
             return
         if self._max_duration and self._start_value != self._shutdown_value:
-            raise pins.error("""{"code": "key289", "msg": "Pin with max duration must have start value equal to shutdown value", "values":[]}""")
-
+            raise pins.error("Pin with max duration must have start"
+                             " value equal to shutdown value")
         mdur_ticks = self._mcu.seconds_to_clock(self._max_duration)
         if mdur_ticks >= 1<<31:
-            raise pins.error("""{"code": "key290", "msg": "Digital pin max duration too large", "values":[]}""")
+            raise pins.error("Digital pin max duration too large")
         self._mcu.request_move_queue_slot()
         self._oid = self._mcu.create_oid()
         self._mcu.add_config_cmd(
@@ -302,7 +302,7 @@ class MCU_pwm:
         self._hardware_pwm = hardware_pwm
     def setup_start_value(self, start_value, shutdown_value, is_static=False):
         if is_static and start_value != shutdown_value:
-            raise pins.error("""{"code": "key288", "msg": "Static pin can not have shutdown value", "values":[]}""")
+            raise pins.error("Static pin can not have shutdown value")
         if self._invert:
             start_value = 1. - start_value
             shutdown_value = 1. - shutdown_value
@@ -311,8 +311,8 @@ class MCU_pwm:
         self._is_static = is_static
     def _build_config(self):
         if self._max_duration and self._start_value != self._shutdown_value:
-            raise pins.error("""{"code": "key289", "msg": "Pin with max duration must have start value equal to shutdown value", "values":[]}""")
-
+            raise pins.error("Pin with max duration must have start"
+                             " value equal to shutdown value")
         cmd_queue = self._mcu.alloc_command_queue()
         curtime = self._mcu.get_printer().get_reactor().monotonic()
         printtime = self._mcu.estimated_print_time(curtime)
@@ -320,7 +320,7 @@ class MCU_pwm:
         cycle_ticks = self._mcu.seconds_to_clock(self._cycle_time)
         mdur_ticks = self._mcu.seconds_to_clock(self._max_duration)
         if mdur_ticks >= 1<<31:
-            raise pins.error("""{"code": "key290", "msg": "Digital pin max duration too large", "values":[]}""")
+            raise pins.error("PWM pin max duration too large")
         if self._hardware_pwm:
             self._pwm_max = self._mcu.get_constant_float("PWM_MAX")
             if self._is_static:
@@ -346,13 +346,13 @@ class MCU_pwm:
             return
         # Software PWM
         if self._shutdown_value not in [0., 1.]:
-            raise pins.error("""{"code": "key291", "msg": "shutdown value must be 0.0 or 1.0 on soft pwm", "values":[]}""")
+            raise pins.error("shutdown value must be 0.0 or 1.0 on soft pwm")
         if self._is_static:
             self._mcu.add_config_cmd("set_digital_out pin=%s value=%d"
                                      % (self._pin, self._start_value >= 0.5))
             return
         if cycle_ticks >= 1<<31:
-            raise pins.error("""{"code": "key292", "msg": "PWM pin cycle time too large", "values":[]}""")
+            raise pins.error("PWM pin cycle time too large")
         self._mcu.request_move_queue_slot()
         self._oid = self._mcu.create_oid()
         self._mcu.add_config_cmd(
@@ -390,7 +390,7 @@ class MCU_pwm:
         if cycle_ticks != self._last_cycle_ticks:
             if cycle_ticks >= 1<<31:
                 raise self._mcu.get_printer().command_error(
-                    """{"code": "key293", "msg": "PWM cycle time too large", "values":[]}""")
+                    "PWM cycle time too large")
             self._set_cycle_ticks.send([self._oid, cycle_ticks],
                                        minclock=minclock, reqclock=clock)
             self._last_cycle_ticks = cycle_ticks
@@ -720,7 +720,7 @@ class MCU:
         self.add_config_cmd("finalize_config crc=%d" % (config_crc,))
         if prev_crc is not None and config_crc != prev_crc:
             self._check_restart("CRC mismatch")
-            raise error("""{"code": "key296", "msg": "MCU '%s' CRC does not match config", "values":["%s"]}""" % (self._name, self._name))
+            raise error("MCU '%s' CRC does not match config" % (self._name,))
         # Transmit config messages (if needed)
         self.register_response(self._handle_starting, 'starting')
         try:
@@ -740,8 +740,8 @@ class MCU:
             if enum_name == 'pin':
                 # Raise pin name errors as a config error (not a protocol error)
                 raise self._printer.config_error(
-                    """{"code": "key297", "msg": "Pin '%s' is not a valid pin name on mcu '%s'", "values":["%s", "%s"]}"""
-                    % (enum_value, self._name, enum_value, self._name))
+                    "Pin '%s' is not a valid pin name on mcu '%s'"
+                    % (enum_value, self._name))
             raise
     def _send_get_config(self):
         get_config_cmd = self.lookup_query_command(
@@ -858,7 +858,7 @@ class MCU:
         pcs = {'endstop': MCU_endstop,
                'digital_out': MCU_digital_out, 'pwm': MCU_pwm, 'adc': MCU_adc}
         if pin_type not in pcs:
-            raise pins.error("""{"code": "key303", "msg": "pin type %s not supported on mcu", "values":["%s"]}""" % (pin_type, pin_type))
+            raise pins.error("pin type %s not supported on mcu" % (pin_type,))
         return pcs[pin_type](self, pin_params)
     def create_oid(self):
         self._oid_count += 1
@@ -1004,7 +1004,6 @@ class MCU:
         self._is_timeout = True
         logging.info("Timeout with MCU '%s' (eventtime=%f)",
                      self._name, eventtime)
-        #code_key = "key506"
         code_key = "key560"
         if self._name == "mcu":
             code_key = "key560"
