@@ -44,9 +44,10 @@ $(OUT)klipper.elf: $(OUT)src/generic/armcm_link.ld
 # Add source files
 src-y += generic/armcm_boot.c generic/armcm_irq.c 
 src-y += generic/armcm_reset.c generic/crc16_ccitt.c
+src-y += gd32/dfu_reboot.c
 
 src-$(CONFIG_MACH_GD32F30X) += gd32/gd32f30x.c gd32/gd32f30x_gpio.c
-src-$(CONFIG_MACH_GD32F30X) += generic/armcm_timer.c
+src-$(CONFIG_MACH_GD32F30X) += gd32/gd32e23x_timer.c generic/timer_irq.c
 # pwm-src-$(CONFIG_MACH_GD32F30X) := gd32/hard_pwm.c
 
 src-$(CONFIG_MACH_GD32E23X) += gd32/gd32e23x.c gd32/gd32e23x_gpio.c  
