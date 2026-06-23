@@ -484,8 +484,8 @@ class RetryAsyncCommand:
             query_time = self.reactor.monotonic()
             if query_time > first_query_time + self.TIMEOUT_TIME:
                 self.serial.register_response(None, self.name, self.oid)
-                raise serialhdl.error("""{"code": "key294", "msg": "Timeout on wait for '%s' response", "values":["%s"]}"""
-                                      % (self.oid, self.name))
+                raise serialhdl.error("Timeout on wait for '%s' response"
+                                      % (self.name,))
             self.serial.raw_send(cmd, minclock, minclock, cmd_queue)
 
 # Wrapper around query commands
@@ -624,21 +624,15 @@ class MCU:
         code_key_string = ""
         if msg == "Timer too close":
             logging.error("msg is Timer too close!!!")
-            code_key_string = "key90"
-        elif msg == "Missed scheduling of next ":
-            code_key_string = "key91"
         elif msg == "ADC out of range":
-            code_key_string = "key92"
             mcu_temp_obj = self._printer.lookup_object('temperature_sensor mcu_temp') if self._printer.objects.get('temperature_sensor mcu_temp') else None
             chamber_temp_obj = self._printer.lookup_object('temperature_sensor chamber_temp') if self._printer.objects.get('temperature_sensor chamber_temp') else None
             heater_bed_obj = self._printer.lookup_object('heater_bed') if self._printer.objects.get('heater_bed') else None
             extruder_obj = self._printer.lookup_object('extruder') if self._printer.objects.get('extruder') else None
             if extruder_obj and extruder_obj.heater.smoothed_temp < 0:
                 msg += " extruder_temp:%s" % round(extruder_obj.heater.smoothed_temp, 2)
-                code_key_string = "key509"
             elif extruder_obj and extruder_obj.heater.smoothed_temp > 500:
                 msg += " extruder_temp:%s" % round(extruder_obj.heater.smoothed_temp, 2)
-                code_key_string = "key515"
             if heater_bed_obj and heater_bed_obj.heater.smoothed_temp < 0:
                 msg += " heater_bed_temp:%s" % round(heater_bed_obj.heater.smoothed_temp, 2)
                 code_key_string = "key510"
@@ -653,20 +647,13 @@ class MCU:
                 code_key_string = "key517"
             if mcu_temp_obj and mcu_temp_obj.last_temp < 0:
                 msg += " mcu_temp:%s" % round(mcu_temp_obj.last_temp, 2)
-                code_key_string = "key512"
             elif mcu_temp_obj and mcu_temp_obj.last_temp > 500:
                 msg += " mcu_temp:%s" % round(mcu_temp_obj.last_temp, 2)
-                code_key_string = "key518"
-        elif msg == "Rescheduled timer in the past":
-            code_key_string = "key93"
-        elif msg == "Command request":
-            code_key_string = "key94"
         if code_key_string in ["key510", "key516", "key511", "key517"]:
             gcode = self._printer.lookup_object('gcode')
-            gcode.respond_info("""{"code": "%s", "msg":"%s", "values": []}""" % (code_key_string, prefix + msg + error_help(msg)))
+            gcode.respond_info("%s" % (prefix + msg + error_help(msg)))
             return
-        self._printer.invoke_async_shutdown(
-            """{"code": "%s", "msg":"%s", "values": []}""" % (code_key_string, prefix + msg + error_help(msg)))
+        self._printer.invoke_async_shutdown(prefix + msg + error_help(msg))
     def _handle_starting(self, params):
         if not self._is_shutdown:
             self._printer.invoke_async_shutdown("MCU '%s' spontaneous restart"
@@ -680,7 +667,7 @@ class MCU:
                      self._name, reason)
         self._printer.request_exit('firmware_restart')
         self._reactor.pause(self._reactor.monotonic() + 2.000)
-        raise error("""{"code": "key295", "msg": "Attempt MCU '%s' restart failed", "values":["%s"]}""" % (self._name, self._name))
+        raise error("Attempt MCU '%s' restart failed" % (self._name,))
     def _connect_file(self, pace=False):
         # In a debugging mode.  Open debug output file and read data dictionary
         start_args = self._printer.get_start_args()
@@ -751,11 +738,11 @@ class MCU:
             return { 'is_config': 0, 'move_count': 500, 'crc': 0 }
         config_params = get_config_cmd.send()
         if self._is_shutdown:
-            raise error("""{"code": "key300", "msg": "MCU '%s' error during config: %s", "values":["%s", "%s"]}""" % (
-                self._name, self._shutdown_msg, self._name, self._shutdown_msg))
+            raise error("MCU '%s' error during config: %s" % (
+                self._name, self._shutdown_msg))
         if config_params['is_shutdown']:
-            raise error("""{"code": "key298", "msg": "Can not update MCU %s config as it is shutdown", "values":["%s"]}""" % (
-                self._name, self._name))
+            raise error("Can not update MCU '%s' config as it is shutdown" % (
+                self._name,))
         return config_params
     def _log_info(self):
         msgparser = self._serial.get_msgparser()
@@ -777,18 +764,18 @@ class MCU:
             self._send_config(None)
             config_params = self._send_get_config()
             if not config_params['is_config'] and not self.is_fileoutput():
-                raise error("""{"code": "key299", "msg": "Unable to configure MCU '%s'", "values":["%s"]}""" % (self._name, self._name))
+                raise error("Unable to configure MCU '%s'" % (self._name,))
         else:
             start_reason = self._printer.get_start_args().get("start_reason")
             if start_reason == 'firmware_restart':
-                raise error("""{"code": "key301", "msg": "Failed automated reset of MCU '%s'", "values":["%s"]}"""
-                            % (self._name, self._name))
+                raise error("Failed automated reset of MCU '%s'"
+                            % (self._name,))
             # Already configured - send init commands
             self._send_config(config_params['crc'])
         # Setup steppersync with the move_count returned by get_config
         move_count = config_params['move_count']
         if move_count < self._reserved_move_slots:
-            raise error("""{"code": "key302", "msg": "Too few moves available on MCU '%s'", "values":["%s"]}""" % (self._name, self._name))
+            raise error("Too few moves available on MCU '%s'" % (self._name,))
         ffi_main, ffi_lib = chelper.get_ffi()
         self._steppersync = ffi_main.gc(
             ffi_lib.steppersync_alloc(self._serial.serialqueue,
@@ -1004,17 +991,8 @@ class MCU:
         self._is_timeout = True
         logging.info("Timeout with MCU '%s' (eventtime=%f)",
                      self._name, eventtime)
-        code_key = "key560"
-        if self._name == "mcu":
-            code_key = "key560"
-        elif self._name == "nozzle_mcu":
-            code_key = "key561"
-        elif self._name == "leveling_mcu":
-            code_key = "key562"
-        elif self._name == "rpi":
-            code_key = "key563"
-        m = """{"code":"%s","msg":"Lost communication with MCU '%s'"}""" % (code_key, self._name)
-        self._printer.invoke_shutdown(m)
+        self._printer.invoke_shutdown("Lost communication with MCU '%s'" % (
+            self._name,))
     def get_status(self, eventtime=None):
         return dict(self._get_status_info)
     def stats(self, eventtime):
