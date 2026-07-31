@@ -14,7 +14,7 @@ DECL_ENUMERATION("pin", "ADC_TEMPERATURE", ADC_TEMPERATURE_PIN);
 static const uint8_t adc_pin[] = {
 	GPIO('A',0),GPIO('A',1),GPIO('A',2),GPIO('A',3),
 	GPIO('A',4),GPIO('A',5),GPIO('A',6),GPIO('A',7),
-	0xff,GPIO('B',1)};
+	GPIO('B',0),GPIO('B',1),ADC_TEMPERATURE_PIN};
 
 #define _ADC_STAT 	ADC_STAT
 #define _ADC_CTL0	ADC_CTL0
