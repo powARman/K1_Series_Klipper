@@ -297,18 +297,7 @@ class PrinterHeaters:
         gcode.register_command("M105", self.cmd_M105, when_not_ready=True)
         gcode.register_command("TEMPERATURE_WAIT", self.cmd_TEMPERATURE_WAIT,
                                desc=self.cmd_TEMPERATURE_WAIT_help)
-        # Register webhooks
-        webhooks = self.printer.lookup_object('webhooks')
-        webhooks.register_endpoint("breakheater", self._handle_breakheater)
-        self.can_break=False
         self.can_break_flag = 0
-    def _handle_breakheater(self,web_request):
-        reactor = self.printer.get_reactor()
-        for heater in self.heaters.values():
-            eventtime = reactor.monotonic()
-            if heater.check_busy(eventtime):
-                self.can_break = True
-
     def load_config(self, config):
         self.have_load_sensors = True
         # Load default temperature sensors
@@ -399,17 +388,11 @@ class PrinterHeaters:
         reactor = self.printer.get_reactor()
         eventtime = reactor.monotonic()
         self.can_break_flag = 1
-        self.can_break = False
         while not self.printer.is_shutdown() and heater.check_busy(eventtime):
-            if self.can_break:
-                self.can_break_flag = 2
-                self.can_break = False
-                break
             print_time = toolhead.get_last_move_time()
             gcode.respond_raw(self._get_temp(eventtime))
             eventtime = reactor.pause(eventtime + 1.)
-        if self.can_break_flag != 2:
-            self.can_break_flag = 3
+        self.can_break_flag = 3
     def set_temperature(self, heater, temp, wait=False):
         toolhead = self.printer.lookup_object('toolhead')
         toolhead.register_lookahead_callback((lambda pt: None))
@@ -435,7 +418,7 @@ class PrinterHeaters:
         toolhead = self.printer.lookup_object("toolhead")
         reactor = self.printer.get_reactor()
         eventtime = reactor.monotonic()
-        while not self.printer.is_shutdown() and not self.can_break:
+        while not self.printer.is_shutdown():
             temp, target = sensor.get_temp(eventtime)
             if temp >= min_temp and temp <= max_temp:
                 return
