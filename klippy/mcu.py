@@ -621,28 +621,6 @@ class MCU:
         prefix = "MCU '%s' shutdown: " % (self._name,)
         if params['#name'] == 'is_shutdown':
             prefix = "Previous MCU '%s' shutdown: " % (self._name,)
-        code_key_string = ""
-        if msg == "Timer too close":
-            logging.error("msg is Timer too close!!!")
-        elif msg == "ADC out of range":
-            mcu_temp_obj = self._printer.lookup_object('temperature_sensor mcu_temp') if self._printer.objects.get('temperature_sensor mcu_temp') else None
-            chamber_temp_obj = self._printer.lookup_object('temperature_sensor chamber_temp') if self._printer.objects.get('temperature_sensor chamber_temp') else None
-            heater_bed_obj = self._printer.lookup_object('heater_bed') if self._printer.objects.get('heater_bed') else None
-            extruder_obj = self._printer.lookup_object('extruder') if self._printer.objects.get('extruder') else None
-            if extruder_obj and (extruder_obj.heater.smoothed_temp < 0 or extruder_obj.heater.smoothed_temp > 500):
-                msg += " extruder_temp:%s" % round(extruder_obj.heater.smoothed_temp, 2)
-            if heater_bed_obj and (heater_bed_obj.heater.smoothed_temp < 0 or heater_bed_obj.heater.smoothed_temp > 500):
-                msg += " heater_bed_temp:%s" % round(heater_bed_obj.heater.smoothed_temp, 2)
-                code_key_string = "key510"
-            if chamber_temp_obj and (chamber_temp_obj.last_temp < 0 or chamber_temp_obj.last_temp > 500):
-                msg += " chamber_temp:%s" % round(chamber_temp_obj.last_temp, 2)
-                code_key_string = "key511"
-            if mcu_temp_obj and (mcu_temp_obj.last_temp < 0 or mcu_temp_obj.last_temp > 500):
-                msg += " mcu_temp:%s" % round(mcu_temp_obj.last_temp, 2)
-        if code_key_string in ["key510", "key511"]:
-            gcode = self._printer.lookup_object('gcode')
-            gcode.respond_info("%s" % (prefix + msg + error_help(msg)))
-            return
         self._printer.invoke_async_shutdown(prefix + msg + error_help(msg))
     def _handle_starting(self, params):
         if not self._is_shutdown:
