@@ -153,7 +153,6 @@ class Homing:
         self.changed_axes = []
         self.trigger_mcu_pos = {}
         self.adjust_pos = {}
-        self.stepper_z_sensorless_flag = False
     def set_axes(self, axes):
         self.changed_axes = axes
     def get_axes(self):
@@ -183,10 +182,7 @@ class Homing:
         endstops = [es for rail in rails for es in rail.get_endstops()]
         hi = rails[0].get_homing_info()
         hmove = HomingMove(self.printer, endstops)
-        if self.stepper_z_sensorless_flag:
-            hmove.homing_move(homepos, hi.speed, False, True, False)
-        else:
-            hmove.homing_move(homepos, hi.speed)
+        hmove.homing_move(homepos, hi.speed)
         # Perform second home
         if hi.retract_dist:
             # Retract

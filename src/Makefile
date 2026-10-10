@@ -1,6 +1,6 @@
 # Main code build rules
 
-src-y += sched.c command.c basecmd.c debugcmds.c fan_check.c
+src-y += sched.c command.c basecmd.c debugcmds.c
 src-$(CONFIG_HAVE_GPIO) += initial_pins.c gpiocmds.c stepper.c endstop.c \
     trsync.c
 src-$(CONFIG_HAVE_PRTOUCH) += prtouch_v2.c hx711s.c dirzctl.c
