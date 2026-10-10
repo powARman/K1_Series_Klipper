@@ -302,8 +302,6 @@ class PrinterHeaters:
         webhooks.register_endpoint("breakheater", self._handle_breakheater)
         self.can_break=False
         self.can_break_flag = 0
-        self.extruder_temperature_wait = False
-        self.bed_temperature_wait = False
     def _handle_breakheater(self,web_request):
         reactor = self.printer.get_reactor()
         for heater in self.heaters.values():
@@ -365,9 +363,7 @@ class PrinterHeaters:
         self.gcode_id_to_sensor[gcode_id] = psensor
     def get_status(self, eventtime):
         return {'available_heaters': self.available_heaters,
-                'available_sensors': self.available_sensors,
-                'extruder_temperature_wait': self.extruder_temperature_wait,
-                'bed_temperature_wait': self.bed_temperature_wait}
+                'available_sensors': self.available_sensors}
     def turn_off_all_heaters(self, print_time=0.):
         for heater in self.heaters.values():
             heater.set_temp(0.)
@@ -404,10 +400,6 @@ class PrinterHeaters:
         eventtime = reactor.monotonic()
         self.can_break_flag = 1
         self.can_break = False
-        if "heater_bed" in heater.name:
-            self.bed_temperature_wait = True
-        else:
-            self.extruder_temperature_wait = True
         while not self.printer.is_shutdown() and heater.check_busy(eventtime):
             if self.can_break:
                 self.can_break_flag = 2
@@ -418,10 +410,6 @@ class PrinterHeaters:
             eventtime = reactor.pause(eventtime + 1.)
         if self.can_break_flag != 2:
             self.can_break_flag = 3
-        if "heater_bed" in heater.name:
-            self.bed_temperature_wait = False
-        else:
-            self.extruder_temperature_wait = False
     def set_temperature(self, heater, temp, wait=False):
         toolhead = self.printer.lookup_object('toolhead')
         toolhead.register_lookahead_callback((lambda pt: None))
