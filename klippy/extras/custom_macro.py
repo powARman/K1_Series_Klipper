@@ -9,11 +9,8 @@ class CUSTOM_MACRO:
     def __init__(self, config):
         self.printer = config.get_printer()
         self.gcode = self.printer.lookup_object('gcode')
-        self.pheaters = None
-        self.heater_hot = None
         self.extruder_temp=None
         self.bed_temp=None
-        self.prtouch = None
         self.gcode.register_command("CX_PRINT_LEVELING_CALIBRATION", self.cmd_CX_PRINT_LEVELING_CALIBRATION, desc=self.cmd_CX_PRINT_LEVELING_CALIBRATION_help)
         self.gcode.register_command("CX_PRINT_DRAW_ONE_LINE", self.cmd_CX_PRINT_DRAW_ONE_LINE, desc=self.cmd_CX_PRINT_DRAW_ONE_LINE_help)
         self.gcode.register_command("CX_ROUGH_G28", self.cmd_CX_ROUGH_G28, desc=self.cmd_CX_ROUGH_G28_help)
@@ -21,8 +18,6 @@ class CUSTOM_MACRO:
         self.default_extruder_temp = config.getfloat("default_extruder_temp", default=240.0)
         self.default_bed_temp = config.getfloat("default_bed_temp", default=50.0)
         self.g28_ext_temp = config.getfloat("g28_ext_temp", default=140.0)
-        self.nozzle_clear = config.getboolean('nozzle_clear', True)
-        self.calibration = config.getint('calibration', default=0)
         self.leveling_calibration = 0
         pass
 
@@ -46,11 +41,11 @@ class CUSTOM_MACRO:
         self.gcode.run_script_from_command('M83') # Enable relative extrusion
         self.gcode.run_script_from_command('G1 X10 Y10 Z2 F6000') # Move to X=10, Y=10, Z=2 at 6000 mm/min (100 mm/s)
         self.gcode.run_script_from_command('G1 Z0.1 F600') # Move Z to 0.1 at 600 mm/min (10 mm/s)
-        self.pheaters = self.printer.lookup_object('heaters')
-        self.heater_hot = self.printer.lookup_object('extruder').heater # Retrieve the hotend heater
+        pheaters = self.printer.lookup_object('heaters')
+        heater_hot = self.printer.lookup_object('extruder').heater # Retrieve the hotend heater
         self.gcode.run_script_from_command('M104 S%d' % (self.extruder_temp)) # Set hotend temperature
         self.gcode.run_script_from_command('M140 S%d' % (self.bed_temp)) # Set bed temperature
-        self.pheaters.set_temperature(self.heater_hot, self.extruder_temp, True) # set hotent temperature and wait until temperature is reached
+        pheaters.set_temperature(heater_hot, self.extruder_temp, True) # set hotent temperature and wait until temperature is reached
         self.gcode.run_script_from_command('G21') # Set units to millimeters
         self.gcode.run_script_from_command('G1 F2400 E-0.5') # Retract filament by 0.5 mm at a feed rate of 2400 mm/min (40 mm/s)
         self.gcode.run_script_from_command('SET_VELOCITY_LIMIT SQUARE_CORNER_VELOCITY=5')
@@ -81,11 +76,11 @@ class CUSTOM_MACRO:
         if self.g28_ext_temp > 180.0:
             self.g28_ext_temp = 180.0
         try:
-            self.prtouch = self.printer.lookup_object('prtouch_v2')
+            prtouch = self.printer.lookup_object('prtouch_v2')
         except:
-            self.prtouch = self.printer.lookup_object('prtouch')
-            gcmd.respond_info("self.prtouch = prtouch")
-        self.prtouch.change_hot_min_temp(self.g28_ext_temp)
+            prtouch = self.printer.lookup_object('prtouch')
+            gcmd.respond_info("prtouch")
+        prtouch.change_hot_min_temp(self.g28_ext_temp)
         self.bed_temp = gcmd.get_float('BED_TEMP', default=self.default_bed_temp, minval=0.0, maxval=130.0)
         self.leveling_calibration = gcmd.get_int('LEVELING_CALIBRATION', default=1, minval=0, maxval=1)
         self.gcode.run_script_from_command('M104 S%d' % (self.g28_ext_temp)) # Set hotend temperature
