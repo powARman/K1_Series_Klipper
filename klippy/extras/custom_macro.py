@@ -15,7 +15,6 @@ class CUSTOM_MACRO:
         self.bed_temp=None
         self.prtouch = None
         self.gcode.register_command("CX_PRINT_LEVELING_CALIBRATION", self.cmd_CX_PRINT_LEVELING_CALIBRATION, desc=self.cmd_CX_PRINT_LEVELING_CALIBRATION_help)
-        self.gcode.register_command("CX_CLEAN_CALIBRATION_FLAGS", self.cmd_CX_CLEAN_CALIBRATION_FLAGS, desc=self.cmd_CX_CLEAN_CALIBRATION_FLAGS_help)
         self.gcode.register_command("CX_PRINT_DRAW_ONE_LINE", self.cmd_CX_PRINT_DRAW_ONE_LINE, desc=self.cmd_CX_PRINT_DRAW_ONE_LINE_help)
         self.gcode.register_command("CX_ROUGH_G28", self.cmd_CX_ROUGH_G28, desc=self.cmd_CX_ROUGH_G28_help)
         self.gcode.register_command("CX_NOZZLE_CLEAR", self.cmd_CX_NOZZLE_CLEAR, desc=self.cmd_CX_NOZZLE_CLEAR_help)
@@ -39,11 +38,6 @@ class CUSTOM_MACRO:
     cmd_CX_PRINT_LEVELING_CALIBRATION_help = "Start Print function,three parameter:EXTRUDER_TEMP(180-300),BED_TEMP(0-100),CALIBRATION(0 or 1)"
     def cmd_CX_PRINT_LEVELING_CALIBRATION(self, gcmd):
         self.gcode.run_script_from_command('CHECK_BED_MESH AUTO_G29=1')
-        pass
-
-    cmd_CX_CLEAN_CALIBRATION_FLAGS_help = "Clean calibration flags"
-    def cmd_CX_CLEAN_CALIBRATION_FLAGS(self, gcmd):
-        self.leveling_calibration = 0
         pass
 
     cmd_CX_PRINT_DRAW_ONE_LINE_help = "Draw one line before printing"
