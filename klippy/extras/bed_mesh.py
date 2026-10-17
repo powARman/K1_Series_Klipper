@@ -125,7 +125,7 @@ class BedMesh:
         gcode_move = self.printer.load_object(config, 'gcode_move')
         gcode_move.set_move_transform(self)
         # initialize status dict
-        self.update_status()  
+        self.update_status()
     def handle_connect(self):
         self.toolhead = self.printer.lookup_object('toolhead')
         self.bmc.print_generated_points(logging.info)
