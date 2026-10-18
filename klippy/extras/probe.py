@@ -372,8 +372,6 @@ class ProbePointsHelper:
         self.probe_type = ""
         if config.has_section('prtouch_v2'):
             self.probe_type = "prtouch_v2"
-        elif config.has_section('bltouch'):
-            self.probe_type = "bltouch"
     def minimum_points(self,n):
         if len(self.probe_points) < n:
             raise self.printer.config_error(

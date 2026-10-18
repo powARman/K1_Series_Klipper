@@ -231,8 +231,6 @@ class PrinterHoming:
         self.probe_type = ""
         if config.has_section('prtouch_v2'):
             self.probe_type = "prtouch_v2"
-        elif config.has_section('bltouch'):
-            self.probe_type = "bltouch"
     def manual_home(self, toolhead, endstops, pos, speed,
                     triggered, check_triggered):
         hmove = HomingMove(self.printer, endstops, toolhead)
