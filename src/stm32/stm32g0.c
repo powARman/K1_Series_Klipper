@@ -32,6 +32,14 @@ lookup_clock_line(uint32_t periph_base)
         uint32_t bit = 1 << ((periph_base - AHBPERIPH_BASE) / 0x400);
         return (struct cline){.en=&RCC->AHBENR, .rst=&RCC->AHBRSTR, .bit=bit};
     }
+#ifdef USART5_BASE
+    if (periph_base == USART5_BASE)
+        return (struct cline){.en=&RCC->APBENR1,.rst=&RCC->APBRSTR1,.bit=1<<8};
+#endif
+#ifdef USART6_BASE
+    if (periph_base == USART6_BASE)
+        return (struct cline){.en=&RCC->APBENR1,.rst=&RCC->APBRSTR1,.bit=1<<9};
+#endif
 #if defined(FDCAN1_BASE) || defined(FDCAN2_BASE)
     if ((periph_base == FDCAN1_BASE) || (periph_base == FDCAN2_BASE))
         return (struct cline){.en=&RCC->APBENR1,.rst=&RCC->APBRSTR1,.bit=1<<12};
@@ -110,8 +118,11 @@ clock_setup(void)
     }
     pllcfgr |= (pll_freq/pll_base) << RCC_PLLCFGR_PLLN_Pos;
     pllcfgr |= (pll_freq/CONFIG_CLOCK_FREQ - 1) << RCC_PLLCFGR_PLLR_Pos;
-    pllcfgr |= (pll_freq/FREQ_USB - 1) << RCC_PLLCFGR_PLLQ_Pos;
-    RCC->PLLCFGR = pllcfgr | RCC_PLLCFGR_PLLREN | RCC_PLLCFGR_PLLQEN;
+#ifdef RCC_PLLCFGR_PLLQ
+    pllcfgr |= ((pll_freq/FREQ_USB - 1) << RCC_PLLCFGR_PLLQ_Pos)
+            | RCC_PLLCFGR_PLLQEN;
+#endif
+    RCC->PLLCFGR = pllcfgr | RCC_PLLCFGR_PLLREN;
     RCC->CR |= RCC_CR_PLLON;
 
     // Wait for PLL lock
