@@ -6,10 +6,14 @@ This is clone from https://github.com/Klipper3d/klipper/
 
 https://www.klipper3d.org/
 
-Used on Creality K1 series devices
+The Klipper firmware controls 3d-Printers. It combines the power of a
+general purpose computer with one or more micro-controllers. See the
+[features document](https://www.klipper3d.org/Features.html) for more
+information on why you should use the Klipper software.
 
-We are https://github.com/Klipper3d/klipper/ Updated relevant functions on the basis
+Start by [installing Klipper software](https://www.klipper3d.org/Installation.html).
 
-release： https://github.com/CrealityOfficial/K1_Series_Klipper/releases
-
-firmware-recovery-tool: https://github.com/CrealityOfficial/K1_Series_Annex/releases/tag/V1.0.0
+Klipper software is Free Software. See the [license](COPYING) or read
+the [documentation](https://www.klipper3d.org/Overview.html). We
+depend on the generous support from our
+[sponsors](https://www.klipper3d.org/Sponsors.html).
