@@ -49,11 +49,18 @@ MAX_STEP_CNT = 4
 MAX_BUF_LEN = 32
 
 
-# PRTouch "endstop" wrapper
-class PRTouchEndstopWrapper:
+# PRTouch probe
+class PRTouchProbe:
     def __init__(self, config):
         self.config = config
         self.printer = config.get_printer()
+
+        # Common probe implementation helpers
+        self.cmd_helper = probe.ProbeCommandHelper(
+            config, self, self.query_endstop)
+        self.probe_offsets = probe.ProbeOffsetsHelper(config)
+        self.probe_session = probe.ProbeSessionHelper(config, self)
+
         self.steppers = []
         self.dbg_msg = {}
         self.shut_down = False
@@ -333,10 +340,10 @@ class PRTouchEndstopWrapper:
         return 0
 
     def add_stepper(self, stepper):
-        self.mm_per_step = self.steppers[0].get_step_dist() * self.step_base
         if stepper in self.steppers:
             return
         self.steppers.append(stepper)
+        self.mm_per_step = self.steppers[0].get_step_dist() * self.step_base
 
     def get_steppers(self):
         return list(self.steppers)
@@ -362,6 +369,18 @@ class PRTouchEndstopWrapper:
     def probe_finish(self, hmove):
         pass
     #endregion
+
+    def get_probe_params(self, gcmd=None):
+        return self.probe_session.get_probe_params(gcmd)
+    def get_offsets(self):
+        return self.probe_offsets.get_offsets()
+    def get_status(self, eventtime):
+        return self.cmd_helper.get_status(eventtime)
+    def start_probe_session(self, gcmd):
+        return self.probe_session.start_probe_session(gcmd)
+    def probing_move(self, pos, speed):
+        phoming = self.printer.lookup_object('homing')
+        return phoming.probing_move(self, pos, speed)
 
     #region Prtouch
     def print_msg(self, title, msg, force=False):
@@ -1291,7 +1310,7 @@ class PRTouchEndstopWrapper:
         min_x, min_y = self.bed_mesh.bmc.mesh_min
         max_x, max_y = self.bed_mesh.bmc.mesh_max
 
-        res1 = self.bed_mesh.bmc.probe_helper.results
+        res1 = self.probe_session.results
         res1.append(last_point)
 
         self.print_msg('WHY DEBUG', 'bed mesh last point=:{}'.format(last_point))
@@ -1830,7 +1849,7 @@ class PRTouchEndstopWrapper:
         x_cnt = self.bed_mesh.bmc.mesh_config['x_count']
         y_cnt = self.bed_mesh.bmc.mesh_config['y_count']
 
-        res1 = self.bed_mesh.bmc.probe_helper.results
+        res1 = self.probe_session.results
         res1.append(last_point)
 
         now_pos = self.toolhead.get_position()

@@ -434,7 +434,7 @@ class ProbePointsHelper:
             nextpos[0] -= self.probe_offsets[0]
             nextpos[1] -= self.probe_offsets[1]
         if self.probe_type == "prtouch_v2":
-            self.printer.lookup_object('probe').mcu_probe.run_to_next(nextpos)
+            self.printer.lookup_object('probe').run_to_next(nextpos)
         else:
             self._move(nextpos, self.speed)
     def start_probe(self, gcmd):

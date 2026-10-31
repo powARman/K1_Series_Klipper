@@ -261,7 +261,7 @@ class PrinterHoming:
         hmove = HomingMove(self.printer, endstops)
         try:
             if self.probe_type == "prtouch_v2":
-                epos = self.printer.lookup_object('probe').mcu_probe.run_G29_Z()
+                epos = mcu_probe.run_G29_Z()
             else:
                 epos = hmove.homing_move(pos, speed, probe_pos=True)
         except self.printer.command_error:
@@ -291,7 +291,7 @@ class PrinterHoming:
                         homing_state.set_axes([a])
                         kin.home(homing_state)
                     else:
-                        result = self.printer.lookup_object('probe').mcu_probe.run_G28_Z()
+                        result = self.printer.lookup_object('probe').run_G28_Z()
                         if not result:
                             gcode = self.printer.lookup_object('gcode')
                             gcode.respond_info("Error during homing move")
