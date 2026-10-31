@@ -599,7 +599,7 @@ class PRTouchProbe:
             self.gcode.run_script_from_command('G1 X%.2f Y%.2f Z%.2f F%d' % (now_pos[0] + self.shake_range, now_pos[1] - self.shake_range, now_pos[2] + self.shake_range / 2, int(60 * max_z_velocity * 0.25)))
             self.gcode.run_script_from_command('G1 X%.2f Y%.2f Z%.2f F%d' % (now_pos[0] + self.shake_range, now_pos[1] + self.shake_range, now_pos[2] - self.shake_range / 2, int(60 * max_z_velocity * 0.25)))
             self.gcode.run_script_from_command('G1 X%.2f Y%.2f Z%.2f F%d' % (now_pos[0] - self.shake_range, now_pos[1] + self.shake_range, now_pos[2] + self.shake_range / 2, int(60 * max_z_velocity * 0.25)))
-            while len(self.toolhead.move_queue.queue) >= 5:
+            while len(self.toolhead.lookahead.queue) >= 5:
                 self.delay_s(0.010)
         self.move(now_pos, self.rdy_z_spd)
         pass
