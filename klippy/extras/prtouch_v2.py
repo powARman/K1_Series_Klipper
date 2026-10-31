@@ -10,17 +10,8 @@ from . import prtouch_v1_wrapper
 def load_config(config):
     pr_version = config.getint('pr_version', default=1, minval=0, maxval=100)
     if pr_version == 2:
-        vrt = prtouch_v2_wrapper.PRTouchEndstopWrapper(config)
+        prtouch = prtouch_v2_wrapper.PRTouchProbe(config)
     if pr_version == 1:
-        vrt = prtouch_v1_wrapper.PRTouchEndstopWrapper(config)
-    config.get_printer().add_object('probe', probe.PrinterProbe(config, vrt))
-    return vrt
-
-
-# /home/cc/moonraker-env/bin/python3.10 /home/cc/moonraker/moonraker/moonraker.py -d /home/cc/printer_data
-# sudo service klipper stop
-# /home/cc/klippy-env/bin/python3.10 /home/cc/klipper/klippy/klippy.py /home/cc/printer_data/config/printer.cfg -a /home/cc/printer_data/comms/klippy.sock -l /home/cc/printer_data/logs/klippy.log
-
-# ./micropython /home/cc/klipper/klippy/klippy.py /home/cc/printer_data/config/printer.cfg -a /home/cc/printer_data/comms/klippy.sock -l /home/cc/printer_data/logs/klippy.log
-
-# /home/cc/klippy-env/bin/python3.10 /home/cc/micropython_test/klipper/klippy/klippy.py /home/cc/printer_data/config/printer.cfg -a /home/cc/printer_data/comms/klippy.sock -l /home/cc/printer_data/logs/klippy.log
+        prtouch = prtouch_v1_wrapper.PRTouchProbe(config)
+    config.get_printer().add_object('probe', prtouch)
+    return prtouch

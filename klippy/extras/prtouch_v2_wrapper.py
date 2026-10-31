@@ -49,8 +49,8 @@ MAX_STEP_CNT = 4
 MAX_BUF_LEN = 32
 
 
-# PRTouch "endstop" wrapper
-class PRTouchEndstopWrapper:
+# PRTouch probe
+class PRTouchProbe:
     def __init__(self, config):
         self.tri_min_hold_init = []
         self.tri_max_hold_init = []
@@ -63,6 +63,13 @@ class PRTouchEndstopWrapper:
 
         self.config = config
         self.printer = config.get_printer()
+
+        # Common probe implementation helpers
+        self.cmd_helper = probe.ProbeCommandHelper(
+            config, self, self.query_endstop)
+        self.probe_offsets = probe.ProbeOffsetsHelper(config)
+        self.probe_session = probe.ProbeSessionHelper(config, self)
+
         self.steppers = []
         self.dbg_msg = {}
         self.shut_down = False
@@ -350,10 +357,10 @@ class PRTouchEndstopWrapper:
         return 0
 
     def add_stepper(self, stepper):
-        self.mm_per_step = self.steppers[0].get_step_dist() * self.step_base
         if stepper in self.steppers:
             return
         self.steppers.append(stepper)
+        self.mm_per_step = self.steppers[0].get_step_dist() * self.step_base
 
     def get_steppers(self):
         return list(self.steppers)
@@ -379,6 +386,18 @@ class PRTouchEndstopWrapper:
     def probe_finish(self, hmove):
         pass
     #endregion
+
+    def get_probe_params(self, gcmd=None):
+        return self.probe_session.get_probe_params(gcmd)
+    def get_offsets(self):
+        return self.probe_offsets.get_offsets()
+    def get_status(self, eventtime):
+        return self.cmd_helper.get_status(eventtime)
+    def start_probe_session(self, gcmd):
+        return self.probe_session.start_probe_session(gcmd)
+    def probing_move(self, pos, speed):
+        phoming = self.printer.lookup_object('homing')
+        return phoming.probing_move(self, pos, speed)
 
     #region Prtouch
     def print_msg(self, title, msg, force=False):
@@ -580,7 +599,7 @@ class PRTouchEndstopWrapper:
             self.gcode.run_script_from_command('G1 X%.2f Y%.2f Z%.2f F%d' % (now_pos[0] + self.shake_range, now_pos[1] - self.shake_range, now_pos[2] + self.shake_range / 2, int(60 * max_z_velocity * 0.25)))
             self.gcode.run_script_from_command('G1 X%.2f Y%.2f Z%.2f F%d' % (now_pos[0] + self.shake_range, now_pos[1] + self.shake_range, now_pos[2] - self.shake_range / 2, int(60 * max_z_velocity * 0.25)))
             self.gcode.run_script_from_command('G1 X%.2f Y%.2f Z%.2f F%d' % (now_pos[0] - self.shake_range, now_pos[1] + self.shake_range, now_pos[2] + self.shake_range / 2, int(60 * max_z_velocity * 0.25)))
-            while len(self.toolhead.move_queue.queue) >= 5:
+            while len(self.toolhead.lookahead.queue) >= 5:
                 self.delay_s(0.010)
         self.move(now_pos, self.rdy_z_spd)
         pass
@@ -945,7 +964,7 @@ class PRTouchEndstopWrapper:
             params = self.deal_avgs_prtouch_cmd.send([self.pres_oid, 8])
             self.print_msg('AVGS_RESAULT', str(params))
             now_pos = self.toolhead.get_position()
-            self.toolhead.set_position(now_pos[:2] + [0, now_pos[3]], homing_axes=[2])
+            self.toolhead.set_position(now_pos[:2] + [0, now_pos[3]], homing_axes='z')
             self.pres_res = []
             self.prtouch_shake_check_error = False
             # 采集数据长度。100个
@@ -1194,7 +1213,7 @@ class PRTouchEndstopWrapper:
                         # self.gcode.run_script_from_command('FORCE_MOVE STEPPER=stepper_z DISTANCE=5 VELOCITY=5')
 
                         # 出现下探过程没触发时，以结束位置为新的高度平面
-                        self.toolhead.set_position(now_pos[:2] + [0, now_pos[3]], homing_axes=[2])
+                        self.toolhead.set_position(now_pos[:2] + [0, now_pos[3]], homing_axes='z')
                         # 抬升一下z轴
                         self.move(now_pos[:2] + [self.bed_max_err, now_pos[3]], self.tri_z_up_spd)
                         self.toolhead.wait_moves()
@@ -1237,7 +1256,7 @@ class PRTouchEndstopWrapper:
             if Z_RefreshFlag == True:
                 self.print_msg('WHY DEBUG',"refresh z home position now_pos{}".format(now_pos))
                 # 以结束位置为新的高度平面
-                self.toolhead.set_position(now_pos[:2] + [0, now_pos[3]], homing_axes=[2])
+                self.toolhead.set_position(now_pos[:2] + [0, now_pos[3]], homing_axes='z')
                 # 抬升一下z轴
                 self.move(now_pos[:2] + [self.bed_max_err, now_pos[3]], self.tri_z_up_spd)
                 self.toolhead.wait_moves()
@@ -1368,7 +1387,7 @@ class PRTouchEndstopWrapper:
         min_x, min_y = self.bed_mesh.bmc.mesh_min
         max_x, max_y = self.bed_mesh.bmc.mesh_max
 
-        res1 = self.bed_mesh.bmc.probe_helper.results
+        res1 = self.probe_session.results
         res1.append(last_point)
 
         self.print_msg('WHY DEBUG', 'bed mesh last point=:{}'.format(last_point))
@@ -1594,7 +1613,7 @@ class PRTouchEndstopWrapper:
         self.bed_mesh.set_mesh(None)
         self.set_step_par(load_sys=False)
         now_pos = self.toolhead.get_position()
-        self.toolhead.set_position(now_pos[:2] + [0, now_pos[3]], homing_axes=[2])
+        self.toolhead.set_position(now_pos[:2] + [0, now_pos[3]], homing_axes='z')
         min_x, min_y = self.bed_mesh.bmc.mesh_min
         max_x, max_y = self.bed_mesh.bmc.mesh_max
         now_pos = [self.home_x, self.home_y, now_pos[2], now_pos[3]]
@@ -1653,7 +1672,7 @@ class PRTouchEndstopWrapper:
             if len(self.pres_res) == 0 or len(self.step_res) == 0:
                 if move_down_cnt < 2:
                     move_down_cnt += 1
-                    self.toolhead.set_position(now_pos0[:2] + [0, now_pos0[3]], homing_axes=[2])
+                    self.toolhead.set_position(now_pos0[:2] + [0, now_pos0[3]], homing_axes='z')
                     self.move(now_pos0[:2] + [self.best_above_z * 2, now_pos0[3]], self.tri_z_up_spd * (1.2 if self.use_adc else 2.0))
                 else:
                     self.delay_s(0.10)
@@ -1674,7 +1693,7 @@ class PRTouchEndstopWrapper:
                 out_mm = (self.toolhead.get_position()[2] - (step_cnt_down - self.step_res[-1]['step']) * self.mm_per_step) \
                         if len(self.pres_res) != MAX_BUF_LEN else self.cal_tri_data(step_cnt_down, self.toolhead.get_position()[2], self.step_res, self.pres_res)
             # 设置当前高度为home点
-            self.toolhead.set_position(now_pos0[:2] + [0, now_pos0[3]], homing_axes=[2])
+            self.toolhead.set_position(now_pos0[:2] + [0, now_pos0[3]], homing_axes='z')
             # 基于当前高度抬升喷头6mm
             # self.move(now_pos0[:2] + [self.best_above_z * 2 if self.pres_buf_cnt > MAX_BUF_LEN else 1, now_pos0[3]], self.tri_z_up_spd * (1.2 if self.use_adc else 2.0))
             # why修改 热床传感器触发后，上面设置触发位置为起始平面高度。此句作用为抬升6mm后，再进行下面的擦嘴或者精探动作
@@ -1707,7 +1726,7 @@ class PRTouchEndstopWrapper:
                 use_tri_min_hold = (self.tri_min_hold[1] - self.tri_min_hold[0]) * rd + self.tri_min_hold[0]
                 use_tri_max_hold = (self.tri_max_hold[1] - self.tri_max_hold[0]) * rd + self.tri_max_hold[0]
             if use_tri_times % 5 == 0:
-                self.toolhead.set_position(now_pos0[:2] + [0, now_pos0[3]], homing_axes=[2])
+                self.toolhead.set_position(now_pos0[:2] + [0, now_pos0[3]], homing_axes='z')
                 self.move(now_pos0[:2] + [self.best_above_z * 2, now_pos0[3]], self.tri_z_up_spd * (1.2 if self.use_adc else 2.0))
                 self.shake_motor(self.shake_cnt)
             if use_tri_times == 19:
@@ -1733,7 +1752,7 @@ class PRTouchEndstopWrapper:
             if not self.run_step_prtouch_flag:
                 self.print_msg('WHY ERROR',"FUN:run_G28_Z run_step_prtouch() ERROR")
                 return False
-            self.toolhead.set_position(now_pos1[:2] + [self.toolhead.get_position()[2] - res_z, now_pos[3]], homing_axes=[2])
+            self.toolhead.set_position(now_pos1[:2] + [self.toolhead.get_position()[2] - res_z, now_pos[3]], homing_axes='z')
             self.print_msg('RUN_G28_Z', 'Start Result Check Probe...')
             self.move(now_pos1[:2] + [self.bed_max_err, now_pos[3]], self.rdy_z_spd)
             ck_z,self.run_step_prtouch_flag = self.run_step_prtouch(self.max_z * 1.2, self.probe_min_3err, False, 3, 3, True)
@@ -1765,7 +1784,7 @@ class PRTouchEndstopWrapper:
         x_cnt = self.bed_mesh.bmc.mesh_config['x_count']
         y_cnt = self.bed_mesh.bmc.mesh_config['y_count']
 
-        res1 = self.bed_mesh.bmc.probe_helper.results
+        res1 = self.probe_session.results
         res1.append(last_point)
 
         now_pos = self.toolhead.get_position()
@@ -1807,7 +1826,7 @@ class PRTouchEndstopWrapper:
                     self.print_msg('WHY ERROR',"FUN:run_re_g29s run_step_prtouch() ERROR")
                     return False
                 now_pos = self.toolhead.get_position()
-                self.toolhead.set_position(now_pos[:2] + [now_pos[2] - res_z, now_pos[3]], homing_axes=[2])
+                self.toolhead.set_position(now_pos[:2] + [now_pos[2] - res_z, now_pos[3]], homing_axes='z')
                 self.run_to_next(res1[i], True)
                 res1[i][2],self.run_step_prtouch_flag = self.run_step_prtouch(self.g29_down_min_z, self.probe_min_3err, True, 5, 3, True)
                 if not self.run_step_prtouch_flag:
