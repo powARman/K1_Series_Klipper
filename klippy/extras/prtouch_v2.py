@@ -186,7 +186,7 @@ class PRTouchProbe:
         self.sys_time_duty      = config.getfloat('sys_time_duty', default=0.001, minval=0.00001, maxval=0.010)
         self.is_corexz          = str(config.getsection('printer').get('kinematics')) == 'corexz'
 
-        # 快速抖动采样测试
+        # Rapid jitter sampling test
         self.shake_sample_num         = config.getint('shake_sample_num', default=100, minval=1, maxval=1000)
         self.shake_z_velocity         = config.getint('shake_z_velocity', default=100, minval=1, maxval=1000)
         self.shake_z_accel            = config.getint('shake_z_accel', default=500, minval=1, maxval=10000)
@@ -467,7 +467,8 @@ class PRTouchProbe:
         if not ck:
             return
         self.print_msg('RAISE_ERROR', "Start Raise Error")
-        # 出错默认抬升热床原理碰头一段距离（默认：25mm）
+        # By default, if an error occurs, the hot bed is raised by a set distance (default: 25 mm)
+        # to prevent a collision.
         self.enable_steps()
         down_min_z = 5
         step_cnt, step_us, acc_ctl_cnt = self.get_step_cnts(down_min_z, 10) #self.tri_z_down_spd[0]
@@ -642,8 +643,8 @@ class PRTouchProbe:
         self.move(now_pos, self.rdy_z_spd)
         pass
 
-    # 检查z轴下探过程脉冲步数是否丢包
-    # return True(成功) False(失败)
+    # Check for packet loss in the number of pulses during the Z-axis descent process
+    # return True(Success) False(Failure)
     def ck_and_manual_get_step(self):
         if len(self.step_res) == MAX_BUF_LEN:
             return True
@@ -662,8 +663,8 @@ class PRTouchProbe:
             return False
         return True
 
-    # 检查z轴下探过程压力数据是否丢包
-    # return True(成功) False(失败)
+    # Check for missing data packets in the pressure data during the Z-axis probe process
+    # return True(Success) False(Failure)
     def ck_and_manual_get_pres(self):
         if len(self.pres_res) == MAX_BUF_LEN:
             return True
@@ -734,17 +735,17 @@ class PRTouchProbe:
                 #     d3_abs = [math.fabs(pres_d_buf[i]), math.fabs(pres_d_buf[i+1]), math.fabs(pres_d_buf[i+2])]
                 #     pres_d_buf[i] = pres_d_buf[i + d3_abs.index(min(d3_abs))]
 
-                # z-score过滤毛刺算法
-                # 阈值一般选2或者3
+                # Z-Score Filtering Algorithm for Glitches
+                # The threshold is usually set to 2 or 3.
                 threshold = 2
-                # 计算数据标准方
+                # Calculate the standard deviation of the data
                 pres_data_len =len(pres_d_buf)
                 pres_data_sum =sum(pres_d_buf)
                 value_mean = pres_data_sum/pres_data_len
                 pres_data_sum = 0
                 for j in range(pres_data_len):
                     pres_data_sum += math.pow(pres_d_buf[j]-value_mean,2)
-                # 标准差
+                # Standard Deviation
                 std_diff =  math.sqrt(pres_data_sum/pres_data_len)
                 for i in range(1,len(pres_d_buf)-2):
                     if math.fabs(pres_d_buf[i]-value_mean)/std_diff > threshold:
@@ -834,21 +835,24 @@ class PRTouchProbe:
         if self.After_G28Z_skip_bed_tilt_flag == False:
             self.print_msg('RUN_TO_NEXT', 'nextpos=%s, wait=%d' % (str(nextpos), wait))
             nextpos_z = self.get_best_rdy_z(nextpos[0], nextpos[1]) + self.best_above_z
-        # 归零后第一次调用，z太高到最大网床倾斜高度
+        # On the first call after resetting, z is too high, up to the maximum tilt height of the
+        # mesh bed.
         else:
             nextpos_z = self.bed_max_err
             self.print_msg('RUN_TO_NEXT', 'After G28Z first run fun(run_to_next) skip bed tilt flag:{} nextpos:{} cal_nextpos_z:{}'.format(self.After_G28Z_skip_bed_tilt_flag,nextpos,nextpos_z))
         self.move(nextpos[:2] + [nextpos_z], self.rdy_xy_spd, wait)
         pass
 
-    # TODO 传感器自检
-    # return True(自检成功) False(自检存在错误)
+    # TODO Sensor Self-Test
+    # return True(Self-test successful) False(Self-check detected an error)
     def env_self_check(self,error_num=1,force=False):
         # 1. PR_ERR_CODE_SWAP_PIN_DETECTI
-        # 下位机设置了同步线为高电平时，调用start_step_prtouch_cmd接口时，无法运行电机，因此测试时
-        # 此项检查同步线信号是否正常。通过发送指令让同步线写高点平、低电平，并读取io电平校验是否正确
+        # When the slave device has the sync line set to a high level, the motor will not run when
+        # the start_step_prtouch_cmd interface is called; therefore, during testing, check whether
+        # the sync line signal is normal. Send commands to set the sync line to high, high-low,
+        # and low levels, and read the I/O levels to verify that they are correct.
 
-        # 如有异常。重新检测一次
+        # If there are any abnormalities, please test again.
         for check_times in range(10):
             static_check_error_state = 0
             self.delay_s(0.2)
@@ -868,32 +872,36 @@ class PRTouchProbe:
                 self.ck_and_raise_error(True, PR_ERR_CODE_SWAP_PIN_DETECTI)
                 return False
 
-            # 以下之间方案不适用于压电陶瓷传感器
+            # The following solutions are not applicable to piezoelectric ceramic sensors.
             if not self.need_self_check and not force or self.use_adc:
                 return True
 
             # 2. PR_ERR_CODE_PRES_READ_DATA_TIMEOUT
-            # 此项检查读取压力传感器数据是否超时，判断通讯、传感器采样率是否正常。默认应变片使用HX711 12ms采集一个数据
-            # 采集压力传感器数据前，要进行一次求平均去皮操作。8为采集8个数据
+            # This check determines whether the pressure sensor data acquisition has timed out and
+            # verifies that communication and the sensor sampling rate are normal. The default
+            # strain gauge uses the HX711, which acquires one data point every 12 ms.
+            # Before acquiring pressure sensor data, an averaging and zeroing operation must be
+            # performed. A value of 8 indicates that 8 data points will be acquired.
             # self.deal_avgs_prtouch_cmd.send([self.pres_oid, 8])
             params = self.deal_avgs_prtouch_cmd.send([self.pres_oid, 16])
             self.print_msg('AVGS_RESAULT', str(params))
             self.pres_res = []
             self.read_pres_prtouch_cmd.send([self.pres_oid, self.tri_acq_ms, 32 + 8])
             start_tick_s = time.time()
-            # 大概等1s,期间判断接收到的数据长度是否达到指定长度
+            # Wait approximately 1 second, checking during that time to see if the length of the
+            # received data has reached the specified length.
             while ((time.time() - start_tick_s) < (1.5 * (self.tri_acq_ms / 1000.) * 64)) and len(self.pres_res) < 32:
                 self.delay_s(0.010)
-            # 发送停止读取压力传感器数据指令
+            # Send a command to stop reading data from the pressure sensor.
             self.read_pres_prtouch_cmd.send([self.pres_oid, self.tri_acq_ms, 0])
-            # 校验通讯是否丢包，如果错误，发送错误
+            # Check for packet loss in the communication; if an error occurs, send an error message.
             if len(self.pres_res) < 32:
                 static_check_error_state = 2
                 continue
             # self.ck_and_raise_error(len(self.pres_res) < 32, PR_ERR_CODE_PRES_READ_DATA_TIMEOUT)
 
             pnt_tick, pnt_vals = [], [[], [], [], []]
-            # 开头和结尾各去掉4个数据
+            # Remove 4 data points from the beginning and 4 from the end.
             for i in range(4, len(self.pres_res) - 4):
                 pnt_tick.append(self.pres_res[i]['tick'] / 10000.)
                 for j in range(self.pres_cnt):
@@ -904,10 +912,11 @@ class PRTouchProbe:
             # self.print_msg('SELF_pres_res', "pres_res:{}".format(self.pres_res))
             self.print_msg('SELF_CHECK_TICK', "TICK:{}".format(pnt_tick))
             self.print_msg('SELF_CHECK_DATA', "DATA:{}".format(pnt_vals))
-            # 发送数据上位机显示波形
+            # Send data; the host computer displays the waveform.
             for i in range(len(pnt_vals)):
                 self.send_wave_tri(i,pnt_vals[i])
-            # 校验采样率 判断采样间隔时间是否超过2倍触发时间（12ms）
+            # Check the sampling rate to determine whether the sampling interval exceeds twice the
+            # trigger time (12 ms).
             if tr / (len(pnt_tick) - 1) > 2 * self.tri_acq_ms:
                 static_check_error_state = 2
                 self.print_msg('DEBUG', '--Self Test 2 = PR_ERR_CODE_PRES_READ_DATA_TIMEOUT, Error!!-- error time:{} Normal:{}'.format(tr / (len(pnt_tick) - 1) , 2 * self.tri_acq_ms), force)
@@ -917,20 +926,22 @@ class PRTouchProbe:
                 self.print_msg('DEBUG', '--Self Test 2 = PR_ERR_CODE_PRES_READ_DATA_TIMEOUT, Pass!!--', force)
 
             # 3. PR_ERR_CODE_PRES_VAL_IS_CONSTANT
-            # 此项检查压力传感器是否出现一个恒定值情况。检查传感器是否正常
-            # 用于确定哪个通道数据异常
+            # This test checks whether the pressure sensor is displaying a constant value. Check
+            # whether the sensor is functioning properly.
+            # Used to determine which channel has abnormal data.
             IS_CONSTANT_CH = []
             for i in range(self.pres_cnt):
                 # sums, avg = 0, sum(pnt_vals[i]) / len(pnt_vals[i])
                 sums = 0
                 for j in range(1,len(pnt_vals[i])):
                     # pnt_vals[i][j] -= avg
-                    # 判断相邻两个数据都为相同数据
+                    # Determine whether two adjacent data points are the same
                     if pnt_vals[i][j] == pnt_vals[i][j-1]:
                         sums += 1
                     else:
                         sums = 0
-                # 判断超过一半数据连续相等。说明存在数据异常
+                # It was determined that more than half of the data points were consecutive and
+                # identical. This indicates the presence of outliers.
                 if sums>len(pnt_vals[i])/2:
                     IS_CONSTANT_CH.append(i)
             if len(IS_CONSTANT_CH) >= error_num:
@@ -941,10 +952,11 @@ class PRTouchProbe:
             else:
                 self.print_msg('DEBUG', '--Self Test 3 = PR_ERR_CODE_PRES_VAL_IS_CONSTANT, Pass!!--', force)
 
-            # 这项容易误触发。旁边如果环境存在震动。容易误判
-            # 这项检查传感器数据是否存在较大噪声。
+            # This feature is prone to false triggers. If there is vibration in the surrounding
+            # environment, it is prone to false readings.
+            # This check verifies whether there is significant noise in the sensor data.
             # 4. PR_ERR_CODE_PRES_NOISE_TOO_BIG
-            # 用于确定哪个通道数据异常
+            # Used to determine which channel's data is abnormal.
             TOO_BIG_CH = []
             for i in range(self.pres_cnt):
                 big_cnt = 0
@@ -961,7 +973,7 @@ class PRTouchProbe:
                 self.print_msg('DEBUG', '--Self Test 4 = PR_ERR_CODE_PRES_NOISE_TOO_BIG, Pass!!--', force=force)
                 break
 
-        # 根据错误状态报错
+        # Report errors based on error status.
         if static_check_error_state == 2:
             self.ck_and_raise_error(True, PR_ERR_CODE_PRES_READ_DATA_TIMEOUT)
         elif static_check_error_state == 3:
@@ -971,7 +983,7 @@ class PRTouchProbe:
         if static_check_error_state != 0:
             return False
 
-        # 抖动检测
+        # Jitter detection
         for check_times in range(2):
             self.delay_s(0.2)
             self.print_msg('WHY_DEBUG', "Shake Check Sensor data! times:{}".format(check_times))
@@ -983,9 +995,11 @@ class PRTouchProbe:
             self.toolhead.set_position(now_pos[:2] + [0, now_pos[3]], homing_axes='z')
             self.pres_res = []
             self.prtouch_shake_check_error = False
-            # 采集数据长度。100个
+            # Data acquisition length: 100 samples.
             datalen = self.shake_sample_num  #100
-            # 由于从发送采集数据开始到shake_motor期间有时延，这是已经采集了一部分传感器数据。如果采集数据量太少则采集不到振动部分的结果
+            # Due to the delay between sending the data acquisition command and starting
+            # shake_motor, some sensor data has already been collected before the motor starts
+            # shaking. If too little data is collected, the vibration portion may not be captured.
             self.read_pres_prtouch_cmd.send([self.pres_oid, self.tri_acq_ms, datalen+25])
             # self.shake_motor(self.shake_cnt)
             self.quick_shake_motor(self.shake_num) #20
@@ -1000,59 +1014,73 @@ class PRTouchProbe:
                 continue
 
             pnt_tick, pnt_vals = [], [[], [], [], []]
-            # 剔除电机振动前的采样数据，大约在第25个开始
+            # Discard the samples collected before the motor starts vibrating. The vibration
+            # starts at approximately sample 25.
             for i in range(25, len(self.pres_res)):
                 pnt_tick.append(self.pres_res[i]['tick'] / 10000.)
                 for j in range(self.pres_cnt):
                     pnt_vals[j].append(self.pres_res[i]['ch%d' % j])
-            # 发送数据上位机显示波形
+            # Send the data to the host computer to display the waveform.
             for i in range(len(pnt_vals)):
                 self.send_wave_tri(i,pnt_vals[i])
                 self.print_msg('SELF_CHECK_DATA', "SHAKE DATA CH[{}]:{}".format(i,pnt_vals[i]))
 
 
-            # 方差判断法,由于传感器静止状态采集到的数据皆为底噪。波动比较小因此标准差比较小 250以内
-            # 如果让热床快速抖动起来，传感器数据呈现较为有规律的上下波动标准差比较大 K1设备（250-2000） K1max设备（250-4000）
-            # 异常情况：
-            # 1、传感器线没插入座子（四条线断开）。标准差很小250以内
-            # 2、抖动过程中，外部连续点击热床（比如手点击热床）或者不均匀外力持续按压(比如手按着热床)。标准差会超过2000
+            # Variance Analysis Method: Since the data collected by the sensor in a stationary
+            # state consists entirely of background noise, the fluctuations are relatively small,
+            # resulting in a standard deviation of less than 250.
+            # If the heated bed is made to vibrate rapidly, the sensor data exhibits relatively
+            # regular up-and-down fluctuations, resulting in a larger standard deviation:
+            # K1 device (250-2000), K1max device (250-4000).
+            # Abnormal Conditions:
+            # 1. The sensor wires are not plugged into the connector (four wires are disconnected).
+            #    The standard deviation is very small, within 250.
+            # 2. During the vibration process, the heated bed is tapped repeatedly from the outside
+            #    (e.g., tapping it with your hand) or subjected to continuous, uneven external
+            #    pressure (e.g., pressing down on the heated bed with your hand). The standard
+            #    deviation will exceed 2000.
             NO_SENSED_CH = []
-            # 判断标准差
+            # Calculating Standard Deviation
             for i in range(self.pres_cnt):
-                # 排序
+                # Sort
                 pnt_vals[i].sort()
                 pnt_vals[i] = pnt_vals[i][3:(len(pnt_vals[i])-3)]
-                # 计算数据标准方
+                # Calculate the standard deviation of the data
                 pres_data_len =len(pnt_vals[i])
                 pres_data_sum =sum(pnt_vals[i])
                 pres_mean = pres_data_sum/pres_data_len
                 pres_data_sum = 0
                 for j in range(pres_data_len):
                     pres_data_sum += math.pow(pnt_vals[i][j]-pres_mean,2)
-                # 标准差
+                # Standard Deviation
                 pres_std =  math.sqrt(pres_data_sum/pres_data_len)
-                # 判断传感器线是否断开及是否有不均匀外力压着热床
+                # Determine whether the sensor wire is disconnected and whether there is any uneven
+                # external pressure on the heated bed.
                 if pres_std < self.check_std_mim:
                     NO_SENSED_CH.append(i)
                 # self.print_msg('DEBUG',"pres_res[{}]:{}".format(i,pnt_vals[i]))
                 self.print_msg('DEBUG'," pres_std[{}]:{:.2f} normal:[{}]".format(i,pres_std,self.check_std_mim))
             if len(NO_SENSED_CH)>=4:
                 self.prtouch_shake_check_error = True
-            # 如果抖动出现异常，再重新抖动采集一次，如果还有异常跳过去探测一次检测
+            # If the jitter is abnormal, perform the jitter acquisition again; if it is still
+            # abnormal, skip it and perform a detection test.
             if len(NO_SENSED_CH) != 0:
                 self.print_msg('DEBUG', '--Self Test 5 = PR_ERR_CODE_PRES_NOT_BE_SENSED, Error!!-- Error CH:{}'.format(NO_SENSED_CH), force)
                 continue
             else:
                 break
-        # 如果存在任意通道抖动检测出异常则进入点击探测验证。如果四个通道都异常直接报错，不点击
+        # If an anomaly is detected in any channel, the system proceeds to click detection
+        # verification. If all four channels show anomalies, an error is reported immediately,
+        # and no click is recorded.
         if len(NO_SENSED_CH) > 0 and len(NO_SENSED_CH) < 4:
-            # 如果抖动检测到有问题，则z轴探测一次
+            # If the jitter detection indicates a problem, the Z-axis is probed once.
             use_tri_z_down_spd = self.tri_z_down_spd[0]
             use_tri_hftr_cut = self.tri_hftr_cut[0]
             use_tri_lftr_k1 = self.tri_lftr_k1[0]
             use_tri_min_hold = self.tri_min_hold[0]
             use_tri_max_hold = self.tri_max_hold[0]
-            # 连续尝试探测2次。如果都检测异常则上报
+            # Attempt to detect the issue twice in a row. If both attempts detect an anomaly,
+            # report it.
             for move_times in range(2):
                 self.enable_steps()
                 self.print_msg('WHY DEBUG', 'check sensor sensitivity')
@@ -1069,12 +1097,13 @@ class PRTouchProbe:
                 self.start_step_prtouch_cmd.send([self.step_oid, 0, 0, 0, 0, 0, self.low_spd_nul, self.send_step_duty, 0])
                 self.start_pres_prtouch_cmd.send([self.pres_oid, 0, 0, 0, 0, 0, 0, 0, 0])
 
-                # 长度为0说明下探过程中没有压力传感器未被触发,继续下探一次
+                # A value of 0 indicates that no pressure sensor was triggered during the descent;
+                # continue with another descent.
                 if len(self.pres_res) == 0 or len(self.step_res) == 0:
                     self.print_msg('WHY DEBUG', '--Self Test 5 bed move max_z*1.2 is not probe,move again--')
                     continue
 
-                # 抬升
+                # Lift
                 self.step_res = []
                 z_up_mm = self.best_above_z * 2
                 step_cnt_down, step_us_down, acc_ctl_cnt = self.get_step_cnts(z_up_mm, use_tri_z_down_spd * (1.2 if self.use_adc else 2.0))
@@ -1084,19 +1113,19 @@ class PRTouchProbe:
                     self.delay_s(0.010)
                 self.start_step_prtouch_cmd.send([self.step_oid, 0, 0, 0, 0, 0, self.low_spd_nul, self.send_step_duty, 0])
 
-                # 判断数据合法性
+                # Validating data
                 if len(self.pres_res) != MAX_BUF_LEN:
                     self.print_msg('WHY DEBUG', '--Self Test 5 pres data len {} < 32--'.format(len(self.pres_res)))
                     continue
 
-                # 压力数据处理
+                # Pressure data processing
                 pnt_vals = [[], [], [], []]
                 NO_SENSED_CH = []
                 for j in range(self.pres_cnt):
                     for i in range(len(self.pres_res)):
                         pnt_vals[j].append(self.pres_res[i]['ch%d' % j])
 
-                # 高通滤波
+                # High-pass filtering
                 rc = 1. / 2. / math.pi / self.cal_hftr_cut
                 coff = rc / (rc + 1. / (1000 / self.tri_acq_ms))
                 NO_SENSED_CH = []
@@ -1105,7 +1134,8 @@ class PRTouchProbe:
                     for i in range(1, len(pnt_vals[j])):
                         pres_d_buf.append(round((pnt_vals[j][i] - pnt_vals[j][i - 1] + pres_d_buf[-1]) * coff,2))
                     pnt_vals[j] = pres_d_buf
-                    # 判断最后个数据小于拔出线后的经验阈值，说明线断了
+                    # If the last data point is determined to be below the empirical threshold set
+                    # after the line was pulled out, this indicates that the line has broken.
                     if (pnt_vals[j][-1] < self.check_std_mim):
                         NO_SENSED_CH.append(j)
                     self.print_msg('DEBUG'," pnt_vals[{}][-1]:{} normal:[{}]".format(j,pnt_vals[j],self.check_std_mim))
@@ -1117,10 +1147,10 @@ class PRTouchProbe:
                     self.prtouch_shake_check_error = False
 
 
-                # 发送数据上位机显示波形
+                # Send data; the host computer displays the waveform.
                 for i in range(len(pnt_vals)):
                     self.send_wave_tri(i,pnt_vals[i])
-                # 退出探测
+                # Exit detection loop
                 break
 
         if len(NO_SENSED_CH) != 0 and self.prtouch_shake_check_error == True:
@@ -1181,10 +1211,11 @@ class PRTouchProbe:
             self.start_step_prtouch_cmd.send([self.step_oid, run_dir, self.tri_send_ms, step_cnt, step_us, acc_ctl, self.low_spd_nul, self.send_step_duty, 0])
         pass
 
-    # 精准探测
-    # 连续两次探测过程数据丢包则会报False
-    # return out_mm flag(True[成功] False[失败])
-    # out_mm 输出探测结果与目标高度差，如果flag为False 默认输出999
+    # Precise detection
+    # If data packets are lost during two consecutive detection processes, the result will be False.
+    # return out_mm flag(True[Success] False[Failure])
+    # out_mm: Outputs the difference between the detection result and the target height; if flag
+    # is False, the default output is 999.
     def run_step_prtouch(self, down_min_z, probe_min_3err, rt_last=False, pro_cnt=3, crt_cnt=3, fast_probe=False, re_g28=False):
         use_tri_times = 0
         ck_step_error_cnt = 0
@@ -1223,14 +1254,15 @@ class PRTouchProbe:
                     self.move(now_pos, self.rdy_z_spd)
                 else:
                     FORCE_MOVE_MAX += 1
-                    # 只有G28Z和擦嘴才使能刷新z高度平面
+                    # Only G28Z and 'wipe' enable the Z-height plane to be refreshed.
                     if self.z_set_status == True:
                         # self.print_msg('WHY DEBUG',"run FORCE_MOVE STEPPER=stepper_z DISTANCE=5 VELOCITY=5 times:{}".format(FORCE_MOVE_MAX))
                         # self.gcode.run_script_from_command('FORCE_MOVE STEPPER=stepper_z DISTANCE=5 VELOCITY=5')
 
-                        # 出现下探过程没触发时，以结束位置为新的高度平面
+                        # If a downward move does not trigger, use the ending point as the new
+                        # height level.
                         self.toolhead.set_position(now_pos[:2] + [0, now_pos[3]], homing_axes='z')
-                        # 抬升一下z轴
+                        # Raise the Z-axis slightly
                         self.move(now_pos[:2] + [self.bed_max_err, now_pos[3]], self.tri_z_up_spd)
                         self.toolhead.wait_moves()
                         now_pos = self.toolhead.get_position()
@@ -1244,7 +1276,7 @@ class PRTouchProbe:
             if not self.ck_and_manual_get_step():
                 ck_step_error_cnt += 1
                 self.print_msg('WHY ERROR',"FUN:run_step_prtouch ck_and_manual_get_step() ERROR Times:{}",ck_step_error_cnt)
-                # 连续连续2次出现丢包就报error
+                # If packet loss occurs twice in a row, an error is reported.
                 if ck_step_error_cnt > 2:
                     self.ck_and_raise_error(True, PR_ERR_CODE_STEP_LOST_RUN_DATA, ["step_res len:{}".format(len(self.step_res))])
                     return 999,False
@@ -1254,30 +1286,31 @@ class PRTouchProbe:
             if not self.ck_and_manual_get_pres():
                 ck_pres_error_cnt += 1
                 self.print_msg('WHY ERROR',"FUN:run_step_prtouch ck_and_manual_get_pres() ERROR Times:{}",ck_pres_error_cnt)
-                # 连续连续2次出现丢包就报error
+                # If packet loss occurs twice in a row, an error is reported.
                 if ck_pres_error_cnt > 2:
                     self.ck_and_raise_error(True, PR_ERR_CODE_PRES_LOST_RUN_DATA, ["pres_res len:{}".format(len(self.pres_res))])
                     return 999,False
             else:
                 ck_pres_error_cnt = 0
 
-            # 擦嘴时探测高度小于最小z范围
+            # When wiping the mouth, the detected height is less than the minimum z-range.
             if self.nozzle_clear_z_out_of_range == True:
                 self.print_msg('WHY DEBUG',"nozzle clear z less than z_min:{},reset z level and prtouch z again!".format(self.min_z))
                 self.nozzle_clear_z_out_of_range = False
                 Z_RefreshFlag = True
 
-            # 下探过程中由于没有触发刷新过z轴的参考0平面后
-            # 的第一次触发位置会被重新设置为z参考0面高度。
+            # During the descent, if the Z-axis reference zero plane has not been updated, the
+            # first trigger position will be reset to the height of the Z-axis reference zero plane.
             if Z_RefreshFlag == True:
                 self.print_msg('WHY DEBUG',"refresh z home position now_pos{}".format(now_pos))
-                # 以结束位置为新的高度平面
+                # Use the end point as the new elevation plane.
                 self.toolhead.set_position(now_pos[:2] + [0, now_pos[3]], homing_axes='z')
-                # 抬升一下z轴
+                # Raise the Z-axis slightly.
                 self.move(now_pos[:2] + [self.bed_max_err, now_pos[3]], self.tri_z_up_spd)
                 self.toolhead.wait_moves()
                 now_pos = self.toolhead.get_position()
-                # 中途误触发测到的高度数据不可用，清零
+                # Height data detected due to an accidental trigger during the process is invalid;
+                # reset to zero.
                 res_z.clear()
                 use_tri_times = 0
                 Z_RefreshFlag = False
@@ -1320,7 +1353,7 @@ class PRTouchProbe:
             while (time.time() - t_last < (down_min_z / use_tri_z_down_spd + 5)) and (len(self.step_res) != MAX_BUF_LEN):
                 self.delay_s(0.010)
             self.start_step_prtouch_cmd.send([self.step_oid, 1, 0, 0, 0, 0, self.low_spd_nul, self.send_step_duty, 0])
-            # 抬升不用ck
+            # No need to use CK for lifting
             # self.ck_and_manual_get_step()
             if len(res_z) >= pro_cnt or can_rt:
                 break
@@ -1328,11 +1361,12 @@ class PRTouchProbe:
         # res_z.sort()
         # self.print_ary('RES_Z', res_z, len(res_z))
         # return res_z[int((len(res_z) - 1) / 2)] if len(res_z) != 2 else (res_z[0] + res_z[1]) / 2
-        # 从小到大排序
+        # Sort from smallest to largest
         self.print_ary('RES_Z', res_z, len(res_z))
         self.Tri_bed_test_z = [round(i,3) for i in res_z]
         res_z.sort()
-        # res_z长度 != 2 选择中位值，res_z长度 = 2 计算均值
+        # If the length of res_z is not equal to 2, select the median;
+        # if the length of res_z is equal to 2, calculate the mean.
         out_mm = res_z[int((len(res_z) - 1) / 2)] if len(res_z) != 2 else (res_z[0] + res_z[1]) / 2
         self.print_msg('WHY DEBUG',"OUT_RES_Z:{:.3f}".format(out_mm))
         return out_mm,True
@@ -1431,7 +1465,7 @@ class PRTouchProbe:
                             err_cnt += 1
                     if err_cnt >= 1 and mid_p not in err_ps:
                         err_ps.append(mid_p)
-                        # i为行数 j为列数
+                        # i is the row number and j is the column number
                         err_ps_post.append([i,j])
 
             self.print_msg('RE_PROBE_POINT', "max_tan:{} len:{} err_ps:{}".format(max_tan,len(err_ps),err_ps))
@@ -1441,13 +1475,13 @@ class PRTouchProbe:
                 if not self.run_step_prtouch_flag:
                     self.print_msg('WHY ERROR',"FUN:bed_mesh_post_proc run_step_prtouch() ERROR")
                     return False
-            # 异常点重测后的结果，更新进入热床数据
+            # Results after retesting of anomalous points; update the data entered into the hot bed
             for i in range(len(err_ps)):
                 pos = 0
-                # 偶数行
+                # Even-numbered lines
                 if err_ps_post[i][0] % 2 ==0:
                     pos = (err_ps_post[i][1]+err_ps_post[i][0]*x_cnt)
-                # 基数行
+                # Odd-numbered lines
                 else:
                     pos = (err_ps_post[i][0]*x_cnt+x_cnt-err_ps_post[i][1]-1)
                 self.print_msg('RE_PROBE_POINT', "new_res1[{}]:{}  old_res1{}:{}".format(pos,err_ps[i],pos,res1[pos]))
@@ -1536,8 +1570,8 @@ class PRTouchProbe:
         configfile.set('prtouch default', 'version', PR_VERSION)
         return True
 
-    # TODO 擦嘴程序
-    # return True(成功) False(失败)
+    # TODO Nozzle-wiping procedure
+    # return True(Success) False(Failure)
     def clear_nozzle(self, hot_min_temp, hot_max_temp, bed_max_temp):
         self.print_msg('CLEAR_NOZZLE', 'Start clear_nozzle(), hot_min_temp=%.2f, hot_max_temp=%.2f, bed_max_temp=%.2f' % (hot_min_temp, hot_max_temp, bed_max_temp))
         min_x, min_y = self.clr_noz_start_x, self.clr_noz_start_y
@@ -1609,8 +1643,8 @@ class PRTouchProbe:
         self.bed_mesh.set_mesh(mesh)
         # self.gcode.run_script_from_command('G28 Z')
         return True
-    #  快速擦嘴程序
-    # return True(成功) False(失败)
+    #  Quick nozzle-ziping procedure
+    # return True(Success) False(Failure)
     def clear_nozzle_quick(self, hot_min_temp, hot_max_temp, bed_max_temp):
         self.print_msg('CLEAR_NOZZLE_QUICK', 'Start clear_nozzle_quick(), hot_min_temp=%.2f, hot_max_temp=%.2f, bed_max_temp=%.2f' % (hot_min_temp, hot_max_temp, bed_max_temp))
         start_x, start_y = self.clr_noz_start_x, self.clr_noz_start_y
@@ -1735,7 +1769,7 @@ class PRTouchProbe:
             self.toolhead.max_accel_to_decel = max_accel_to_decel
             self.bed_mesh.set_mesh(mesh)
         else:
-            #普通擦嘴
+            # Ordinary nozzle-wiping
             min_x, min_y = self.clr_noz_start_x, self.clr_noz_start_y
             self.set_step_par(load_sys=False)
             random.seed(time.time())
@@ -1764,8 +1798,8 @@ class PRTouchProbe:
         # self.gcode.run_script_from_command('G28 Z')
         return True
 
-    # TODO Z轴回0 G28_Z
-    # return True(Z归零成功) False(Z归零失败)
+    # Z-axis homing G28_Z
+    # return True(Z homing successful) False(Z homing failed)
     def run_G28_Z(self, accurate=False):
         self.print_msg('RUN_G28_Z', 'Start run_G28_Z({})...'.format(accurate))
         if self.pr_version == 2:
@@ -1804,7 +1838,7 @@ class PRTouchProbe:
             self.set_fan_speed('heater_fan', self.fan_heat_min_spd)
         self.set_fan_speed('fan', 0.0)
         self.move(now_pos0, self.rdy_xy_spd / 5)
-        # 自检异常。退出G28_Z
+        # Self-test error; exit.
         if not self.env_self_check():
             self.print_msg('WHY ERROR',"FUN:G28_Z env_self_check() ERROR")
             return False
@@ -1849,29 +1883,35 @@ class PRTouchProbe:
                     self.delay_s(0.10)
                 continue
 
-            # 默认一个错误的输出高度999
+            # Set the default error output height to 999
             out_mm = 999
             if not self.ck_and_manual_get_step():
                 ck_step_error_cnt += 1
                 self.print_msg('WHY ERROR',"FUN:G28_Z ck_and_manual_get_step() ERROR Times:{}",ck_step_error_cnt)
-                # 连续连续2次出现丢包就报error
+                # If packet loss occurs twice in a row, an error is reported.
                 if ck_step_error_cnt > 2:
                     self.ck_and_raise_error(True, PR_ERR_CODE_STEP_LOST_RUN_DATA, ["step_res len:{}".format(len(self.step_res))])
                     return False
             else:
                 ck_step_error_cnt = 0
-                # 粗探计算z轴高度
+                # Preliminary calculation of the Z-Axis height
                 out_mm = (self.toolhead.get_position()[2] - (step_cnt_down - self.step_res[-1]['step']) * self.mm_per_step) \
                         if len(self.pres_res) != MAX_BUF_LEN else self.cal_tri_data(step_cnt_down, self.toolhead.get_position()[2], self.step_res, self.pres_res)
-            # 设置当前高度为home点
+            # Set the current elevation to the home point
             self.toolhead.set_position(now_pos0[:2] + [0, now_pos0[3]], homing_axes='z')
-            # 基于当前高度抬升喷头6mm
+            # Based on the current nozzle height of 6 mm.
             # self.move(now_pos0[:2] + [self.best_above_z * 2 if self.pres_buf_cnt > MAX_BUF_LEN else 1, now_pos0[3]], self.tri_z_up_spd * (1.2 if self.use_adc else 2.0))
-            # why修改 热床传感器触发后，上面设置触发位置为起始平面高度。此句作用为抬升6mm后，再进行下面的擦嘴或者精探动作
-            # 如果人为或者误差多次导致热床传感器快速触发。热床会一直移动远离喷头，要是本身热床距离外边框比较近，探测次数在范围内。
-            # 这里可能会导致热床撞边框。目前这个问题没有很好的解法
+            # Why modify: After the heated bed sensor is triggered, the trigger position is set to
+            # the height of the starting plane. This line ensures that the bed is raised by 6 mm
+            # before performing the nozzle cleaning or fine probe operation below.
+            # If the heated bed sensor is triggered rapidly multiple times due to user error or
+            # other factors, the heated bed will continue to move away from the nozzle. If the
+            # heated bed is already close to the outer frame, the number of probes will remain
+            # within the acceptable range.
+            # This could cause the heated bed to collide with the frame. Currently, there is no
+            # good solution to this problem.
             self.move(now_pos0[:2] + [self.best_above_z * 2, now_pos0[3]], self.tri_z_up_spd * (1.2 if self.use_adc else 2.0))
-            # if self.pres_buf_cnt > MAX_BUF_LEN: why修改
+            # if self.pres_buf_cnt > MAX_BUF_LEN: Why the change?
             recored_Coarse_Probe_mm.append(out_mm)
             out_mms.append(math.fabs(out_mm))
             if len(out_mms) > 3:
@@ -1886,7 +1926,9 @@ class PRTouchProbe:
             if self.tri_try_max_times != 0:
                 if use_tri_times == self.tri_try_max_times:
                     self.print_msg('WHY ERROR', "FUN:G28_Z Coarse Probe Out of max {} times:{}. all data:{}".format(self.tri_try_max_times,use_tri_times,recored_Coarse_Probe_mm))
-                    # 如果粗探连续超过10次都没有确定。说明热床或者探测有问题。报探测超时
+                    # If the coarse probe fails to detect a signal for more than 10 consecutive
+                    # attempts, this indicates a problem with the heated bed or the probe.
+                    # A "probe timeout" error is reported.
                     self.ck_and_raise_error(True, PR_ERR_CODE_G28_Z_DETECTION_TIMEOUT)
                     return False
             if use_tri_times <= 20 and use_tri_times >= 5:
@@ -1902,7 +1944,9 @@ class PRTouchProbe:
                 self.shake_motor(self.shake_cnt)
             if use_tri_times == 19:
                 self.print_msg('WHY ERROR', "FUN:G28_Z Coarse Probe Out of max 19 times:{}. all data:{}".format(use_tri_times,recored_Coarse_Probe_mm))
-                # 如果没设置最大触发次数，强制粗探连续超过20次都没有确定。说明热床或者探测有问题。报探测超时
+                # If no maximum trigger count has been set and the coarse probe fails to confirm a
+                # reading after more than 20 consecutive attempts, this indicates a problem with
+                # the heated bed or the probe. A "probe timeout" error is reported.
                 self.ck_and_raise_error(True, PR_ERR_CODE_G28_Z_DETECTION_TIMEOUT)
                 return False
         if not accurate:
@@ -2009,7 +2053,7 @@ class PRTouchProbe:
         del res1[-1]
         return last_z
 
-    # return True(成功) False(失败)
+    # return True(Success) False(Failure)
     def run_G29_Z(self):
         self.print_msg('RUN_G29_Z', 'Start run_G29_Z()...')
         self.set_step_par(load_sys=False)
@@ -2054,7 +2098,9 @@ class PRTouchProbe:
                 self.print_msg('WHY ERROR',"FUN:run_G29_Z run_step_prtouch() ERROR")
                 return False
 
-            # G29_Z后 home点归零时 z轴探测到的高度大于运行的最小丢步距离判定为丢步
+            # G29_Z: When returning to the home position, if the height detected by the Z-axis is
+            # greater than the minimum step loss distance during operation, it is determined to be
+            # a step loss.
             if math.fabs(res_z) > self.lost_step_dis and self.lost_step_dis > 0:
                 self.print_msg('WHY ERROR',"FUN:run_G29_Z check last point res_z:({}) out of lost_step_dis:{}".format(math.fabs(res_z),self.lost_step_dis))
                 self.ck_and_raise_error(True, PR_ERR_CODE_HAVE_LOST_STEP,["RUN_G29_Z check last point res_z:({}) out of lost_step_dis:{}".format(math.fabs(res_z),self.lost_step_dis)])
@@ -2094,7 +2140,7 @@ class PRTouchProbe:
 
         return now_pos
 
-    # TODO 读取压力数据
+    # TODO Read pressure data
     cmd_READ_PRES_help = "Read The Press Vals."
     def cmd_READ_PRES(self, gcmd):
         self.print_msg('VERSION', 'ARM(PRTH)=%s, MCU(PRES)=%s, MCU(STEP)=%s' % (self.ver_prth, self.ver_pres, self.ver_step))
@@ -2121,7 +2167,7 @@ class PRTouchProbe:
             self.send_wave_tri(i, pnt_vals[i])
         pass
 
-    # TODO 测试同步线
+    # TODO Testing the synchronization cable
     cmd_TEST_SWAP_help = "Test The Swap Pin."
     def cmd_TEST_SWAP(self, gcmd):
         self.write_swap_prtouch_cmd.send([self.pres_oid, 1])
@@ -2266,7 +2312,7 @@ class PRTouchProbe:
         pass
     cmd_TRIG_BED_TEST_help = "Test The Tri in bed mesh"
     def cmd_TRIG_BED_TEST(self, gcmd):
-        # 暂时先关闭网床数据
+        # Temporarily disable the online bed data.
         if not self.bed_mesh.get_mesh() and self.bed_mesh.pmgr.profiles.get('default', None):
             self.gcode.run_script_from_command('BED_MESH_PROFILE LOAD=\"default\"')
         mesh = self.bed_mesh.get_mesh()
@@ -2278,7 +2324,7 @@ class PRTouchProbe:
         if file_flag == 1:
             dirs = "/usr/share/klipper/pres_data/"
             _path = dirs + now_time+"_Tri_bedmesh_data_{}_{}.csv".format(run_cnt,run_spd)
-            # 文件夹不存在则新建
+            # If the folder does not exist, create a new one.
             if not os.path.exists(dirs):
                 os.makedirs(dirs)
             self.save_pres_file = open(_path,mode="w")
@@ -2292,12 +2338,12 @@ class PRTouchProbe:
                 self.save_pres_file.close()
                 self.save_pres_file = None
 
-        # 计算网床采样点位置
+        # Calculate the locations of the mesh sampling points.
         min_x, min_y = self.bed_mesh.bmc.mesh_min
         max_x, max_y = self.bed_mesh.bmc.mesh_max
         x_cnt = self.bed_mesh.bmc.mesh_config['x_count']
         y_cnt = self.bed_mesh.bmc.mesh_config['y_count']
-        # 计算跨度
+        # Calculate span
         x_dist = (max_x - min_x) / (x_cnt - 1)
         y_dist = (max_y - min_y) / (y_cnt - 1)
         # floor distances down to next hundredth
@@ -2305,7 +2351,7 @@ class PRTouchProbe:
         y_dist = math.floor(y_dist * 100) / 100
         if x_dist < 1. or y_dist < 1.:
             raise self.printer.command_error("cmd_TRIG_BED_TEST bed_mesh: min/max points too close together")
-        # 按照路径计算采样点位置
+        # Calculate the location of sampling points based on the path.
         max_x = min_x + x_dist * (x_cnt - 1)
         pos_y = min_y
         points = []
