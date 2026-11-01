@@ -226,7 +226,6 @@ class PRTouchProbe:
         self.step_mcu.register_config_callback(self._build_step_config)
         self.pres_mcu.register_config_callback(self._build_pres_config)
 
-        self.gcode.register_command('TEST_PRTH', self.cmd_TEST_PRTH, desc=self.cmd_TEST_PRTH_help)
         self.gcode.register_command('READ_PRES', self.cmd_READ_PRES, desc=self.cmd_READ_PRES_help)
         self.gcode.register_command('TEST_SWAP', self.cmd_TEST_SWAP, desc=self.cmd_TEST_SWAP_help)
         self.gcode.register_command('DEAL_AVGS', self.cmd_DEAL_AVGS, desc=self.cmd_DEAL_AVGS_help)
@@ -2362,33 +2361,6 @@ class PRTouchProbe:
     cmd_SELF_CHECK_PRTOUCH_help = "Self check the pres."
     def cmd_SELF_CHECK_PRTOUCH(self, gcmd):
         self.env_self_check()
-        pass
-
-    cmd_TEST_PRTH_help = "For Debug Cmd"
-    def cmd_TEST_PRTH(self, gcmd):
-        # self.env_self_check(force=True)
-        # self.print_msg('%f' % self.noz_ex_com)
-        # zero_z = gcmd.get_float('Z', 0)
-        # self.shake_motor(self.shake_cnt)
-        # spd = gcmd.get_float('S', 0)
-        # self.set_fan_speed('heater_fan', spd)
-        # self.set_fan_speed('fan', 1.0)
-        # read_cnt = gcmd.get_int('C', 1)
-        # for i in range(read_cnt):
-        #     self.gcode.run_script_from_command('BED_MESH_CALIBRATE')
-        #     self.gcode.run_script_from_command('BED_MESH_OUTPUT')
-
-        # x_cnt = self.bed_mesh.bmc.mesh_config['x_count']
-        # y_cnt = self.bed_mesh.bmc.mesh_config['y_count']
-        # min_x, min_y = self.bed_mesh.bmc.mesh_min
-        # max_x, max_y = self.bed_mesh.bmc.mesh_max
-
-        # x_len = (max_x - min_x) / x_cnt
-        # y_len = (max_y - min_y) / y_cnt
-
-        # res1 = []
-        # for i in range(x_cnt * y_cnt):
-        #     res1.append([int((i % x_cnt) * x_len + min_x), int(int(i / y_cnt) * int(y_len) + min_y), 0.01 * i])
         pass
 
     def change_hot_min_temp(self, temp):
