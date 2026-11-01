@@ -659,7 +659,6 @@ class PRTouchProbe:
                 sdir = {'tick': params['tick%d' % j] / 10000., 'step': params['step%d' % j], 'index': params['index']}
                 self.step_res.insert(i + j, sdir)
         if len(self.step_res) != MAX_BUF_LEN:
-            # self.ck_and_raise_error(True, PR_ERR_CODE_STEP_LOST_RUN_DATA, ["step_res len:{}".format(len(self.step_res))])
             return False
         return True
 
@@ -681,7 +680,6 @@ class PRTouchProbe:
                 rdir = {'tick':params['tick_%d' % j] / 10000., 'ch0': params['ch0_%d' % j], 'ch1': params['ch1_%d' % j], 'ch2': params['ch2_%d' % j], 'ch3': params['ch3_%d' % j], 'index': params['index']}
                 self.pres_res.insert(i + j, rdir)
         if len(self.pres_res) != MAX_BUF_LEN:
-            # self.ck_and_raise_error(True, PR_ERR_CODE_PRES_LOST_RUN_DATA, ["pres_res len:{}".format(len(self.pres_res))])
             return False
         return True
 
@@ -700,14 +698,6 @@ class PRTouchProbe:
 
     def cal_tri_data(self, start_step, start_pos_z, step_res, pres_res, oft_z=0):
 
-        # 0. Send Debut Msg.
-        # self.print_res()
-        # for i in range(self.pres_cnt):
-        #     tmp_buf = []
-        #     for j in range(len(pres_res)):
-        #         tmp_buf.append(pres_res[j]['ch%d' % i])
-        #     self.send_wave_tri(i, tmp_buf)
-        #     pass
         # 1. Get Best Tri Ch
         max_x, max_y = self.bed_mesh.bmc.mesh_max
         _valid_ch, l_chs = self.get_valid_ch()
@@ -731,10 +721,6 @@ class PRTouchProbe:
 
             # 4. Filter The Pres Data
             if not self.use_adc:
-                # for i in range(len(pres_d_buf) - 2):
-                #     d3_abs = [math.fabs(pres_d_buf[i]), math.fabs(pres_d_buf[i+1]), math.fabs(pres_d_buf[i+2])]
-                #     pres_d_buf[i] = pres_d_buf[i + d3_abs.index(min(d3_abs))]
-
                 # Z-Score Filtering Algorithm for Glitches
                 # The threshold is usually set to 2 or 3.
                 threshold = 2
@@ -795,7 +781,7 @@ class PRTouchProbe:
             self.trig_info[valid_ch]=pres_tri_index
         self.print_res()
         self.print_ary('OUT_MMS', out_mms, len(out_mms), 2)
-        return sum(out_mms) / len(out_mms) # out_val_mm
+        return sum(out_mms) / len(out_mms)
 
     def get_step_cnts(self, run_dis, run_spd):
         if not self.mm_per_step:
@@ -843,7 +829,7 @@ class PRTouchProbe:
         self.move(nextpos[:2] + [nextpos_z], self.rdy_xy_spd, wait)
         pass
 
-    # TODO Sensor Self-Test
+    # Sensor Self-Test
     # return True(Self-test successful) False(Self-check detected an error)
     def env_self_check(self,error_num=1,force=False):
         # 1. PR_ERR_CODE_SWAP_PIN_DETECTI
@@ -898,7 +884,6 @@ class PRTouchProbe:
             if len(self.pres_res) < 32:
                 static_check_error_state = 2
                 continue
-            # self.ck_and_raise_error(len(self.pres_res) < 32, PR_ERR_CODE_PRES_READ_DATA_TIMEOUT)
 
             pnt_tick, pnt_vals = [], [[], [], [], []]
             # Remove 4 data points from the beginning and 4 from the end.
@@ -921,7 +906,6 @@ class PRTouchProbe:
                 static_check_error_state = 2
                 self.print_msg('DEBUG', '--Self Test 2 = PR_ERR_CODE_PRES_READ_DATA_TIMEOUT, Error!!-- error time:{} Normal:{}'.format(tr / (len(pnt_tick) - 1) , 2 * self.tri_acq_ms), force)
                 continue
-                # self.ck_and_raise_error(tr / (len(pnt_tick) - 1) > 2 * self.tri_acq_ms, PR_ERR_CODE_PRES_READ_DATA_TIMEOUT)
             else:
                 self.print_msg('DEBUG', '--Self Test 2 = PR_ERR_CODE_PRES_READ_DATA_TIMEOUT, Pass!!--', force)
 
@@ -931,10 +915,8 @@ class PRTouchProbe:
             # Used to determine which channel has abnormal data.
             IS_CONSTANT_CH = []
             for i in range(self.pres_cnt):
-                # sums, avg = 0, sum(pnt_vals[i]) / len(pnt_vals[i])
                 sums = 0
                 for j in range(1,len(pnt_vals[i])):
-                    # pnt_vals[i][j] -= avg
                     # Determine whether two adjacent data points are the same
                     if pnt_vals[i][j] == pnt_vals[i][j-1]:
                         sums += 1
@@ -948,7 +930,6 @@ class PRTouchProbe:
                 static_check_error_state = 3
                 self.print_msg('DEBUG', '--Self Test 3 = PR_ERR_CODE_PRES_VAL_IS_CONSTANT, Error!!-- IS_CONSTANT_CH:{}'.format(IS_CONSTANT_CH), force)
                 continue
-                # self.ck_and_raise_error(True, PR_ERR_CODE_PRES_VAL_IS_CONSTANT,IS_CONSTANT_CH)
             else:
                 self.print_msg('DEBUG', '--Self Test 3 = PR_ERR_CODE_PRES_VAL_IS_CONSTANT, Pass!!--', force)
 
@@ -968,7 +949,6 @@ class PRTouchProbe:
                 static_check_error_state = 4
                 self.print_msg('DEBUG', '--Self Test 4 = PR_ERR_CODE_PRES_NOISE_TOO_BIG, Error!!-- TOO_BIG_CH:{}'.format(TOO_BIG_CH), force=force)
                 continue
-                # self.ck_and_raise_error(True, PR_ERR_CODE_PRES_NOISE_TOO_BIG,TOO_BIG_CH)
             else:
                 self.print_msg('DEBUG', '--Self Test 4 = PR_ERR_CODE_PRES_NOISE_TOO_BIG, Pass!!--', force=force)
                 break
@@ -996,13 +976,12 @@ class PRTouchProbe:
             self.pres_res = []
             self.prtouch_shake_check_error = False
             # Data acquisition length: 100 samples.
-            datalen = self.shake_sample_num  #100
+            datalen = self.shake_sample_num
             # Due to the delay between sending the data acquisition command and starting
             # shake_motor, some sensor data has already been collected before the motor starts
             # shaking. If too little data is collected, the vibration portion may not be captured.
             self.read_pres_prtouch_cmd.send([self.pres_oid, self.tri_acq_ms, datalen+25])
-            # self.shake_motor(self.shake_cnt)
-            self.quick_shake_motor(self.shake_num) #20
+            self.quick_shake_motor(self.shake_num)
             while ((time.time() - start_tick_s) < (1.5 * (self.tri_acq_ms / 1000.) * datalen)) and len(self.pres_res) < datalen:
                 self.delay_s(0.010)
             self.read_pres_prtouch_cmd.send([self.pres_oid, self.tri_acq_ms, 0])
@@ -1256,9 +1235,6 @@ class PRTouchProbe:
                     FORCE_MOVE_MAX += 1
                     # Only G28Z and 'wipe' enable the Z-height plane to be refreshed.
                     if self.z_set_status == True:
-                        # self.print_msg('WHY DEBUG',"run FORCE_MOVE STEPPER=stepper_z DISTANCE=5 VELOCITY=5 times:{}".format(FORCE_MOVE_MAX))
-                        # self.gcode.run_script_from_command('FORCE_MOVE STEPPER=stepper_z DISTANCE=5 VELOCITY=5')
-
                         # If a downward move does not trigger, use the ending point as the new
                         # height level.
                         self.toolhead.set_position(now_pos[:2] + [0, now_pos[3]], homing_axes='z')
@@ -1358,9 +1334,6 @@ class PRTouchProbe:
             if len(res_z) >= pro_cnt or can_rt:
                 break
             use_tri_times += 1
-        # res_z.sort()
-        # self.print_ary('RES_Z', res_z, len(res_z))
-        # return res_z[int((len(res_z) - 1) / 2)] if len(res_z) != 2 else (res_z[0] + res_z[1]) / 2
         # Sort from smallest to largest
         self.print_ary('RES_Z', res_z, len(res_z))
         self.Tri_bed_test_z = [round(i,3) for i in res_z]
@@ -1377,7 +1350,6 @@ class PRTouchProbe:
 
         def _correct_bed_mesh_one_data():
             def _correct_check(now_pos):
-                # self.pres_res = []
                 self.gcode.run_script_from_command('READ_PRES C=5')
                 min_x, min_y = self.bed_mesh.bmc.mesh_min
                 max_x, max_y = self.bed_mesh.bmc.mesh_max
@@ -1417,7 +1389,6 @@ class PRTouchProbe:
             correct_up_dis = 0.
             now_pos = self.toolhead.get_position()
             while(_correct_check(now_pos) == False and correct_up_dis < 1.0):
-                # now_pos = self.toolhead.get_position()
                 self.move(now_pos[:2] + [now_pos[2] + self.correct_step_mm], self.rdy_z_spd, True)
                 correct_up_dis += self.correct_step_mm
                 now_pos = self.toolhead.get_position()
@@ -1451,7 +1422,6 @@ class PRTouchProbe:
 
             err_ps = []
             err_ps_post = []
-            # max_tan = self.bed_max_err * 2 * 1.2 / min([(max_x - min_x), (max_y - min_y)])
             max_tan = 3 / min([(max_x - min_x), (max_y - min_y)])
             for i in range(len(res_yx)):
                 # self.print_msg('RE_PROBE_POINT', "res_yx[{}]:{}".format(i,res_yx[i]))
@@ -1570,12 +1540,11 @@ class PRTouchProbe:
         configfile.set('prtouch default', 'version', PR_VERSION)
         return True
 
-    # TODO Nozzle-wiping procedure
+    # Nozzle-wiping procedure
     # return True(Success) False(Failure)
     def clear_nozzle(self, hot_min_temp, hot_max_temp, bed_max_temp):
         self.print_msg('CLEAR_NOZZLE', 'Start clear_nozzle(), hot_min_temp=%.2f, hot_max_temp=%.2f, bed_max_temp=%.2f' % (hot_min_temp, hot_max_temp, bed_max_temp))
         min_x, min_y = self.clr_noz_start_x, self.clr_noz_start_y
-        # max_x, max_y = self.clr_noz_start_x + self.clr_noz_len_x, self.clr_noz_start_y + self.clr_noz_len_y
         self.set_bed_temps(temp=bed_max_temp, wait=False)
         self.set_hot_temps(temp=hot_min_temp, wait=False, err=10)
         self.ck_g28ed()
@@ -1641,7 +1610,6 @@ class PRTouchProbe:
         self.set_bed_temps(temp=bed_max_temp, wait=True, err=5)
         self.set_step_par(load_sys=True)
         self.bed_mesh.set_mesh(mesh)
-        # self.gcode.run_script_from_command('G28 Z')
         return True
     #  Quick nozzle-ziping procedure
     # return True(Success) False(Failure)
@@ -1663,9 +1631,6 @@ class PRTouchProbe:
         self.toolhead.max_accel_to_decel = 10000
         self.toolhead.square_corner_velocity = self.clr_xy_quick_spd
 
-        #mesh = self.bed_mesh.get_mesh()
-        #self.bed_mesh.set_mesh(None)
-        #self.set_step_par(load_sys=False)
         random.seed(time.time())
         cur_pos = self.toolhead.get_position()
         src_pos = [start_x ,start_y, self.bed_max_err, cur_pos[3]]
@@ -1795,7 +1760,6 @@ class PRTouchProbe:
             self.set_bed_temps(temp=bed_max_temp, wait=True, err=5)
             self.set_step_par(load_sys=True)
             self.bed_mesh.set_mesh(mesh)
-        # self.gcode.run_script_from_command('G28 Z')
         return True
 
     # Z-axis homing G28_Z
@@ -1911,7 +1875,6 @@ class PRTouchProbe:
             # This could cause the heated bed to collide with the frame. Currently, there is no
             # good solution to this problem.
             self.move(now_pos0[:2] + [self.best_above_z * 2, now_pos0[3]], self.tri_z_up_spd * (1.2 if self.use_adc else 2.0))
-            # if self.pres_buf_cnt > MAX_BUF_LEN: Why the change?
             recored_Coarse_Probe_mm.append(out_mm)
             out_mms.append(math.fabs(out_mm))
             if len(out_mms) > 3:
@@ -2025,7 +1988,6 @@ class PRTouchProbe:
             self.print_msg('WHY ERROR',"FUN:run_re_g29s run_step_prtouch() ERROR")
             return False
         self.print_msg('RUN_RE_G29S', 'Step Lost Check, need=0, tri=%.2f' % res_z)
-        # res_z = 10
         if math.fabs(res_z) > self.lost_step_dis and self.lost_step_dis > 0:
             self.run_G28_Z(True)
             self.probe_ready()
@@ -2140,7 +2102,7 @@ class PRTouchProbe:
 
         return now_pos
 
-    # TODO Read pressure data
+    # Read pressure data
     cmd_READ_PRES_help = "Read The Press Vals."
     def cmd_READ_PRES(self, gcmd):
         self.print_msg('VERSION', 'ARM(PRTH)=%s, MCU(PRES)=%s, MCU(STEP)=%s' % (self.ver_prth, self.ver_pres, self.ver_step))
@@ -2167,7 +2129,7 @@ class PRTouchProbe:
             self.send_wave_tri(i, pnt_vals[i])
         pass
 
-    # TODO Testing the synchronization cable
+    # Testing the synchronization cable
     cmd_TEST_SWAP_help = "Test The Swap Pin."
     def cmd_TEST_SWAP(self, gcmd):
         self.write_swap_prtouch_cmd.send([self.pres_oid, 1])
@@ -2308,7 +2270,7 @@ class PRTouchProbe:
         self.enable_steps()
         self.get_mm_per_step()
         run_cnt = gcmd.get_int('C', 1)
-        self.run_step_prtouch(20, 0, False, run_cnt, run_cnt, True) # (self.max_z*1.2, 0, False, run_cnt, run_cnt, True)
+        self.run_step_prtouch(20, 0, False, run_cnt, run_cnt, True)
         pass
     cmd_TRIG_BED_TEST_help = "Test The Tri in bed mesh"
     def cmd_TRIG_BED_TEST(self, gcmd):
@@ -2378,8 +2340,7 @@ class PRTouchProbe:
             self.run_to_next(points[i], True)
             now_pos = self.toolhead.get_position()
             self.print_msg("WHY DEBUG","Start Tri Point:{} Pos:{}".format(i,now_pos[:-1]))
-            self.run_step_prtouch(20, 0, False, run_cnt, run_cnt, True) # (self.max_z*1.2, 0, False, run_cnt, run_cnt, True)
-            # str_t = ''
+            self.run_step_prtouch(20, 0, False, run_cnt, run_cnt, True)
             tri_z_max = max(self.Tri_bed_test_z)
             tri_z_min = min(self.Tri_bed_test_z)
             diff_max_min = tri_z_max - tri_z_min
