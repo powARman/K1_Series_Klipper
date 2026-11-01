@@ -52,6 +52,18 @@ MAX_BUF_LEN = 32
 # PRTouch probe
 class PRTouchProbe:
     def __init__(self, config):
+        self.pr_version = config.getint('pr_version', default=1, minval=0, maxval=100)
+
+        if pr_version == 2:
+            self.tri_min_hold_init = []
+            self.tri_max_hold_init = []
+            self.tri_min_hold_ALL = []
+            self.tri_max_hold_ALL = []
+            for i in range(36):
+              i = i + 1
+              self.tri_min_hold_ALL.append(config.getintlist('tri_min_hold_%d' % i))
+              self.tri_max_hold_ALL.append(config.getintlist('tri_max_hold_%d' % i))
+
         self.config = config
         self.printer = config.get_printer()
 
@@ -89,8 +101,19 @@ class PRTouchProbe:
 
         self.tri_min_hold       = config.getintlist('tri_min_hold', default=([3, 3] if self.use_adc else [2000, 20000]))
         self.tri_max_hold       = config.getintlist('tri_max_hold', default=([3072, 3072] if self.use_adc else [6000, 60000]))
+
+        if pr_version == 2:
+            self.tri_min_hold_init  = self.tri_min_hold
+            self.tri_max_hold_init  = self.tri_max_hold
+
         self.tri_hftr_cut       = config.getfloatlist('tri_hftr_cut', default=[2, 1])
         self.tri_lftr_k1        = config.getfloatlist('tri_lftr_k1', default=([0.50, 0.50] if self.use_adc else [0.70, 0.30]))
+
+        self.correct_tri_hold = 0
+        if pr_version == 2:
+            # Correct bed mesh
+            self.correct_tri_hold     = config.getint('correct_tri_hold', default=0, minval=0, maxval=50000)
+            self.correct_step_mm      = config.getfloat('correct_step_mm', default=0.04, minval=-0.5, maxval=0.5)
 
         # 2. Debug Cfg
         self.show_msg           = config.getboolean('show_msg', default=False)
@@ -109,11 +132,15 @@ class PRTouchProbe:
         self.clr_noz_len_x      = config.getfloat('clr_noz_len_x', default=0, minval=self.pa_clr_dis_mm + 6, maxval=1000)
         self.clr_noz_len_y      = config.getfloat('clr_noz_len_y', default=0, minval=0, maxval=1000)
         self.clr_xy_spd         = config.getfloat('clr_xy_spd', default=2.0, minval=0.1, maxval=10)
-        self.clr_noz_quick      = config.getboolean('clr_noz_quick', default=False)
-        self.clr_quick_times    = config.getint('clr_quick_times', default=5, minval=1, maxval=10)
-        self.clr_quick_high     = config.getfloat('clr_quick_high', default=2.0, minval=0.1, maxval=10)
-        self.clr_xy_quick_spd   = config.getfloat('clr_xy_quick_spd', default=100.0, minval=10.0, maxval=300.0)
-        self.clr_quick_react_dis = config.getfloat('clr_quick_react_dis', default=5.0, minval=0.0, maxval=15.0)
+
+        self.clr_noz_quick = False
+        if pr_version == 1:
+            self.clr_noz_quick      = config.getboolean('clr_noz_quick', default=False)
+            self.clr_quick_times    = config.getint('clr_quick_times', default=5, minval=1, maxval=10)
+            self.clr_quick_high     = config.getfloat('clr_quick_high', default=2.0, minval=0.1, maxval=10)
+            self.clr_xy_quick_spd   = config.getfloat('clr_xy_quick_spd', default=100.0, minval=10.0, maxval=300.0)
+            self.clr_quick_react_dis = config.getfloat('clr_quick_react_dis', default=5.0, minval=0.0, maxval=15.0)
+
         # 5. Speed Cfg
         self.tri_z_down_spd     = config.getfloatlist('speeds', default=([10, 10] if self.use_adc else [2.5, 1.0])) # speed
         self.tri_z_up_spd       = config.getfloat('lift_speed', self.tri_z_down_spd[0] * (1.0 if self.use_adc else 2.0), minval=0.1, maxval=100)
@@ -148,6 +175,12 @@ class PRTouchProbe:
         self.gcode              = self.printer.lookup_object('gcode')
         self.lost_step_dis      = config.getfloat('lost_step_dis', default=0.5, minval=0, maxval=10)
         self.tilt_corr_dis      = config.getfloat('tilt_corr_dis', default=0, minval=-0.1, maxval=0.1)
+
+        if pr_version == 2:
+            self.bed_mesh_top_mid_com         = config.getfloat('bed_mesh_top_mid_com', default=0.0, minval=-1, maxval=1)
+            self.bed_mesh_bottom_mid_com      = config.getfloat('bed_mesh_bottom_mid_com', default=0.0, minval=-1, maxval=1)
+            self.bed_mesh_left_mid_com        = config.getfloat('bed_mesh_left_mid_com', default=0.0, minval=-1, maxval=1)
+            self.bed_mesh_right_mid_com       = config.getfloat('bed_mesh_right_mid_com', default=0.0, minval=-1, maxval=1)
 
         self.noz_ex_com         = config.getfloat('noz_ex_com', default=0.0, minval=0, maxval=1)    # Nozzle expansion compensation
         self.sys_time_duty      = config.getfloat('sys_time_duty', default=0.001, minval=0.00001, maxval=0.010)
@@ -1304,6 +1337,66 @@ class PRTouchProbe:
         self.print_msg('WHY DEBUG',"OUT_RES_Z:{:.3f}".format(out_mm))
         return out_mm,True
 
+    def correct_bed_mesh_data(self, mesh_data):
+        if self.correct_tri_hold == 0 or self.use_adc:
+            return 0.0
+
+        def _correct_bed_mesh_one_data():
+            def _correct_check(now_pos):
+                # self.pres_res = []
+                self.gcode.run_script_from_command('READ_PRES C=5')
+                min_x, min_y = self.bed_mesh.bmc.mesh_min
+                max_x, max_y = self.bed_mesh.bmc.mesh_max
+                mid_x, mid_y = (min_x + max_x) / 2, (min_y + max_y) / 2
+                #         |
+                #   ch2   |   ch3
+                # --------+--------
+                #   ch0   |   ch1
+                #         |
+                ch = 0
+                if now_pos[0] <= mid_x:
+                    if now_pos[1] <= mid_y:
+                        # pres ch0
+                        ch = 0
+                        pass
+                    else:
+                        # pres ch2
+                        ch = 2
+                        pass
+                else:
+                    if now_pos[1] <= mid_y:
+                        # pres ch1
+                        ch = 1
+                        pass
+                    else:
+                        # pres ch3
+                        ch = 3
+                        pass
+                pres_ary = [x['ch%d' % ch] for x in self.pres_res]
+                pres_ary.sort()
+                best_pres = pres_ary[int(len(pres_ary) / 2)]
+                result = abs(best_pres) < self.correct_tri_hold
+                self.print_msg('CORRECT_BED_MESH_DATA', "Pres ch%d data=%d, now_z:%.2f, result:%d" % (ch, best_pres, now_pos[2], result))
+
+                return result
+
+            correct_up_dis = 0.
+            now_pos = self.toolhead.get_position()
+            while(_correct_check(now_pos) == False and correct_up_dis < 1.0):
+                # now_pos = self.toolhead.get_position()
+                self.move(now_pos[:2] + [now_pos[2] + self.correct_step_mm], self.rdy_z_spd, True)
+                correct_up_dis += self.correct_step_mm
+                now_pos = self.toolhead.get_position()
+            return correct_up_dis
+
+        for i in range(len(mesh_data)):
+            self.run_to_next(mesh_data[i])
+            self.deal_avgs_prtouch_cmd.send([self.pres_oid, 8])
+            self.move(mesh_data[i], self.rdy_z_spd, True)
+            _correct_bed_mesh_one_data()
+            mesh_data[i][2] = self.toolhead.get_position()[2]
+
+
     def bed_mesh_post_proc(self, last_point):
         x_cnt = self.bed_mesh.bmc.mesh_config['x_count']
         y_cnt = self.bed_mesh.bmc.mesh_config['y_count']
@@ -1360,33 +1453,39 @@ class PRTouchProbe:
                 self.print_msg('RE_PROBE_POINT', "new_res1[{}]:{}  old_res1{}:{}".format(pos,err_ps[i],pos,res1[pos]))
                 res1[pos] = err_ps[i]
 
-        # 2. Resize tilt
-        for i in range(len(res1)):
-            res1[i][2] += (0 + self.noz_ex_com)
-            res1[i][2] += (1 - (res1[i][1] - min_y) / (max_y - min_y)) * (2 * self.tilt_corr_dis) - self.tilt_corr_dis
-
-        # 3. Resize Mid Z
-        mid_z = self.noz_ex_com
-        if (x_cnt % 2 == 1) and (y_cnt % 2 == 1):
-            mid_z = res1[int(len(res1) / 2)][2]
-        else:
-            if (x_cnt % 2 == 0) and (y_cnt % 2 == 0):
-                axi = [[x_cnt / 2 - 1, y_cnt / 2 - 1], [x_cnt / 2, y_cnt / 2 - 1], [x_cnt / 2 - 1, y_cnt / 2], [x_cnt / 2, y_cnt / 2]]
-            elif x_cnt % 2 == 1:
-                axi = [[int(x_cnt / 2), y_cnt / 2 - 1], [int(x_cnt / 2), y_cnt / 2]]
-            elif y_cnt % 2 == 1:
-                axi = [[x_cnt / 2 - 1, int(y_cnt / 2)], [x_cnt / 2, int(y_cnt / 2)]]
-
-            mid_z = 0
-
-            for i in range(len(axi)):
-                mid_z += res1[int(axi[i][0] + axi[i][1] * x_cnt)][2]
-            mid_z /= len(axi)
-
-        if mid_z < self.noz_ex_com:
-            mid_z = self.noz_ex_com - mid_z
+        if self.correct_tri_hold == 0:
+            # 2. Resize tilt
             for i in range(len(res1)):
-                res1[i][2] += mid_z
+                res1[i][2] += (0 + self.noz_ex_com)
+                res1[i][2] += (1 - (res1[i][1] - min_y) / (max_y - min_y)) * (2 * self.tilt_corr_dis) - self.tilt_corr_dis
+
+            # 3. Resize Mid Z
+            mid_z = self.noz_ex_com
+            if (x_cnt % 2 == 1) and (y_cnt % 2 == 1):
+                mid_z = res1[int(len(res1) / 2)][2]
+            else:
+                if (x_cnt % 2 == 0) and (y_cnt % 2 == 0):
+                    axi = [[x_cnt / 2 - 1, y_cnt / 2 - 1], [x_cnt / 2, y_cnt / 2 - 1], [x_cnt / 2 - 1, y_cnt / 2], [x_cnt / 2, y_cnt / 2]]
+                elif x_cnt % 2 == 1:
+                    axi = [[int(x_cnt / 2), y_cnt / 2 - 1], [int(x_cnt / 2), y_cnt / 2]]
+                elif y_cnt % 2 == 1:
+                    axi = [[x_cnt / 2 - 1, int(y_cnt / 2)], [x_cnt / 2, int(y_cnt / 2)]]
+
+                mid_z = 0
+
+                for i in range(len(axi)):
+                    mid_z += res1[int(axi[i][0] + axi[i][1] * x_cnt)][2]
+                mid_z /= len(axi)
+
+            if mid_z < self.noz_ex_com:
+                mid_z = self.noz_ex_com - mid_z
+                for i in range(len(res1)):
+                    res1[i][2] += mid_z
+        else:
+            # x. Correct bed mesh data
+            self.correct_bed_mesh_data(res1)
+            for i in range(len(res1)):
+                res1[i][2] += (0 + self.noz_ex_com)
 
         self.print_msg('BED_MESH_POST_PROC', 'After=' + str(res1))
         del res1[-1]
@@ -1413,7 +1512,10 @@ class PRTouchProbe:
             err_cnt, errs = 0, []
 
             for i in range(4):
-                mesh_z = self.bed_mesh.z_mesh.calc_z(self.rdy_pos[i][0], self.rdy_pos[i][1]) - self.noz_ex_com - ((1 - (self.rdy_pos[i][1] - min_y) / (max_y - min_y)) * (2 * self.tilt_corr_dis) - self.tilt_corr_dis)
+                if self.correct_tri_hold == 0:
+                    mesh_z = self.bed_mesh.z_mesh.calc_z(self.rdy_pos[i][0], self.rdy_pos[i][1]) - self.noz_ex_com - ((1 - (self.rdy_pos[i][1] - min_y) / (max_y - min_y)) * (2 * self.tilt_corr_dis) - self.tilt_corr_dis)
+                else:
+                    mesh_z = self.bed_mesh.z_mesh.calc_z(self.rdy_pos[i][0], self.rdy_pos[i][1]) - self.noz_ex_com
                 errs.append(abs(self.rdy_pos[i][2] - mesh_z))
                 err_cnt += (1 if errs[i] > self.check_bed_mesh_max_err else 0)
                 self.print_msg('CK_BED_MESH', 'P%d = [x=%.2f, y=%.2f, mest_z=%.2f, probe_z=%.2f, err_z=%.2f]' % (i, self.rdy_pos[i][0], self.rdy_pos[i][1], mesh_z, self.rdy_pos[i][2], errs[i]))
@@ -1666,6 +1768,10 @@ class PRTouchProbe:
     # return True(Z归零成功) False(Z归零失败)
     def run_G28_Z(self, accurate=False):
         self.print_msg('RUN_G28_Z', 'Start run_G28_Z({})...'.format(accurate))
+        if pr_version == 2:
+            self.print_msg('RUN_G28_Z', 'self.tri_min_hold_ALL=%d' % (self.tri_min_hold_ALL[0][0]))
+            self.tri_min_hold = self.tri_min_hold_init
+            self.tri_max_hold = self.tri_max_hold_init
         self.enable_steps()
         self.get_mm_per_step()
         self.g29_cnt = 0
@@ -1914,6 +2020,13 @@ class PRTouchProbe:
         if (int(self.g29_cnt) % int(x_cnt)) == 0:
             self.shake_motor(self.shake_cnt / 4)
         self.print_msg('RUN_G29_Z', 'g29_cnt=%d, x=%.2f, y=%.2f, z=%.2f' % (self.g29_cnt, now_pos[0], now_pos[1], now_pos[2]))
+
+        if pr_version == 2:
+            self.tri_min_hold = self.tri_min_hold_ALL[self.g29_cnt]
+            self.tri_max_hold = self.tri_max_hold_ALL[self.g29_cnt]
+            self.print_msg('CALIBRATE_tri_min', 'self.tri_min_hold_%d=%d,%d' % (self.g29_cnt + 1,self.tri_min_hold_ALL[self.g29_cnt][0],self.tri_min_hold_ALL[self.g29_cnt][1]))
+            self.print_msg('CALIBRATE_tri_max', 'self.tri_max_hold_%d=%d,%d' % (self.g29_cnt + 1,self.tri_max_hold_ALL[self.g29_cnt][0],self.tri_max_hold_ALL[self.g29_cnt][1]))
+
         if self.g29_cnt == 0:
             if self.use_adc:
                 self.set_fan_speed('heater_fan', self.fan_heat_min_spd)
@@ -1954,6 +2067,31 @@ class PRTouchProbe:
             if self.use_adc:
                 self.set_fan_speed('heater_fan', self.fan_heat_max_spd)
         self.set_step_par(load_sys=True)
+        if pr_version == 2:
+            self.tri_min_hold = self.tri_min_hold_init
+            self.tri_max_hold = self.tri_max_hold_init
+
+            min_x, min_y = self.bed_mesh.bmc.mesh_min
+            max_x, max_y = self.bed_mesh.bmc.mesh_max
+            top_mid_pos = [min_x + ((max_x - min_x) / (x_cnt - 1)) * int(x_cnt / 2) , max_y, 0.0]
+            bottom_mid_pos = [min_x + ((max_x - min_x) / (x_cnt - 1)) * int(x_cnt / 2) , min_y, 0.0]
+            left_mid_pos = [min_x, min_y + ((max_y - min_y) / (y_cnt - 1)) * int(y_cnt / 2), 0.0]
+            right_mid_pos = [max_x, min_y + ((max_y - min_y) / (y_cnt - 1)) * int(y_cnt / 2), 0.0]
+            self.print_msg('RUN_G29_Z', 'min_x:%f, min_y:%f, max_x:%f, max_y:%f, x_cnt:%d, y_cnt:%d' % (min_x, min_y, max_x, max_y, x_cnt, y_cnt))
+            self.print_msg('RUN_G29_Z', 'now_pos(%f, %f, %f) top_mid_pos(%f, %f, %f)' % (now_pos[0], now_pos[1], now_pos[2], top_mid_pos[0], top_mid_pos[1], top_mid_pos[2]))
+            if now_pos[0] == top_mid_pos[0] and now_pos[1] == top_mid_pos[1]:
+                self.print_msg('RUN_G29_Z', 'mesh_point(%f, %f, %f) bed_mesh_top_mid_com:%f, com_z:%f' % (now_pos[0], now_pos[1], now_pos[2], self.bed_mesh_top_mid_com, now_pos[2] + self.bed_mesh_top_mid_com))
+                now_pos[2] += self.bed_mesh_top_mid_com
+            if now_pos[0] == bottom_mid_pos[0] and now_pos[1] == bottom_mid_pos[1]:
+                self.print_msg('RUN_G29_Z', 'mesh_point(%f, %f, %f) bed_mesh_bottom_mid_com:%f, com_z:%f' % (now_pos[0], now_pos[1], now_pos[2], self.bed_mesh_bottom_mid_com, now_pos[2] + self.bed_mesh_bottom_mid_com))
+                now_pos[2] += self.bed_mesh_bottom_mid_com
+            if now_pos[0] == left_mid_pos[0] and now_pos[1] == left_mid_pos[1]:
+                self.print_msg('RUN_G29_Z', 'mesh_point(%f, %f, %f) bed_mesh_left_mid_com:%f, com_z:%f' % (now_pos[0], now_pos[1], now_pos[2], self.bed_mesh_left_mid_com, now_pos[2] + self.bed_mesh_left_mid_com))
+                now_pos[2] += self.bed_mesh_left_mid_com
+            if now_pos[0] == right_mid_pos[0] and now_pos[1] == right_mid_pos[1]:
+                self.print_msg('RUN_G29_Z', 'mesh_point(%f, %f, %f) bed_mesh_right_mid_com:%f, com_z:%f' % (now_pos[0], now_pos[1], now_pos[2], self.bed_mesh_right_mid_com, now_pos[2] + self.bed_mesh_right_mid_com))
+                now_pos[2] += self.bed_mesh_right_mid_com
+
         return now_pos
 
     # TODO 读取压力数据
